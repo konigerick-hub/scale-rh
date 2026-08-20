@@ -8,7 +8,7 @@ import { COOKIE_SESSAO, lerToken } from '@/lib/auth/session';
  *
  * Roda no Edge runtime, por isso só importa `jose` (nada de driver nativo aqui).
  */
-export async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const sessao = await lerToken(req.cookies.get(COOKIE_SESSAO)?.value);
 
   if (!sessao) {
