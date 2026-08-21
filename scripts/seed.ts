@@ -1,35 +1,30 @@
 import 'dotenv/config';
-import { eq } from 'drizzle-orm';
-import { db } from '../lib/db';
-import { empresas, usuarios, colaboradores, vinculos } from '../lib/db/schema';
-import { hashSenha, validarForcaSenha } from '../lib/auth/password';
+import { randomUUID } from 'node:crypto';
+import { promises as fs } from 'node:fs';
+import path from 'node:path';
+import { hashSenha, validarForcaSenha } from '../lib/auth/password.ts';
+import { reaisParaCentavos, type BaseDados, type Colaborador } from '../lib/store/tipos.ts';
 
 /**
  * Carga inicial.
  *
  * Origem: "Planilha funcionários.xlsx". Lá, quem atua em mais de uma empresa
- * aparece repetido; aqui cada pessoa é UMA linha em `colaboradores`, com N
- * linhas em `vinculos`. 52 pessoas, 66 vínculos.
+ * aparece repetido; aqui cada pessoa é UM registro com N vínculos.
+ * 52 pessoas, 66 vínculos.
  *
  * Nascimento e data de contratação não constavam na planilha e ficam nulos.
  *
- * Rodar:  npm run db:seed
+ * Rodar:  npm run seed
  */
 
 const MS = 'Mentoria Scale';
 const AI = 'Acelera Imob';
 const MO = 'Mundo Ótico';
 
-const EMPRESAS = [
-  { nome: MS, cor: '#16A891' },
-  { nome: AI, cor: '#2F6F9E' },
-  { nome: MO, cor: '#9C6A2E' },
-];
+type V = { empresa: string; cargo: string; valor: number };
+type P = { nome: string; vinculos: V[] };
 
-type Vinculo = { empresa: string; cargo: string; valor: number };
-type Pessoa = { nome: string; vinculos: Vinculo[] };
-
-const PESSOAS: Pessoa[] = [
+const PESSOAS: P[] = [
   { nome: 'Homero', vinculos: [{ empresa: MS, cargo: 'SDR', valor: 2500 }] },
   { nome: 'Luiz Antônio - Tom', vinculos: [{ empresa: MS, cargo: 'SDR', valor: 2500 }] },
   { nome: 'João Henrique', vinculos: [{ empresa: MS, cargo: 'SDR', valor: 2000 }] },
@@ -38,8 +33,6 @@ const PESSOAS: Pessoa[] = [
   { nome: 'Otávio', vinculos: [{ empresa: MS, cargo: 'COO - CLOSER', valor: 4000 }] },
   { nome: 'Rui', vinculos: [{ empresa: AI, cargo: 'SDR', valor: 2200 }] },
   { nome: 'Fred', vinculos: [{ empresa: AI, cargo: 'CLOSER', valor: 3000 }] },
-
-  // Atua nas três empresas com valores distintos.
   {
     nome: 'Victor Paredes',
     vinculos: [
@@ -48,7 +41,6 @@ const PESSOAS: Pessoa[] = [
       { empresa: MS, cargo: 'Head', valor: 1500 },
     ],
   },
-
   { nome: 'Jean Lucca', vinculos: [{ empresa: MS, cargo: 'DESIGNER E EDITOR DE VÍDEO', valor: 3000 }] },
   { nome: 'João Cordeiro', vinculos: [{ empresa: AI, cargo: 'SDR', valor: 2300 }] },
   {
@@ -63,10 +55,8 @@ const PESSOAS: Pessoa[] = [
   { nome: 'Daniel Kern', vinculos: [{ empresa: MO, cargo: 'SDR', valor: 1800 }] },
   { nome: 'Davi Kern', vinculos: [{ empresa: AI, cargo: 'CONSULTOR DE SERVIÇOS', valor: 6000 }] },
   { nome: 'Hiury', vinculos: [{ empresa: MO, cargo: 'SDR', valor: 2000 }] },
-
-  // Sem valor na planilha — entra como 0 para ser preenchido depois.
+  // Sem valor na planilha — entra zerado para ser preenchido depois.
   { nome: 'Growth', vinculos: [{ empresa: MS, cargo: 'EDITOR DE VÍDEO', valor: 0 }] },
-
   { nome: 'Gustavo LIMA Louco', vinculos: [{ empresa: MO, cargo: 'CLOSER', valor: 2500 }] },
   { nome: 'Osvaldo', vinculos: [{ empresa: AI, cargo: 'CLOSER', valor: 3000 }] },
   { nome: 'Lucas Joaquim', vinculos: [{ empresa: MO, cargo: 'CLOSER', valor: 3000 }] },
@@ -76,8 +66,7 @@ const PESSOAS: Pessoa[] = [
   { nome: 'Felipe', vinculos: [{ empresa: AI, cargo: 'GESTOR TRÁFEGO', valor: 2000 }] },
   { nome: 'Samuel', vinculos: [{ empresa: AI, cargo: 'GESTOR PROJETOS', valor: 0 }] },
   { nome: 'Ellen', vinculos: [{ empresa: MO, cargo: 'GESTOR PROJETOS', valor: 2900 }] },
-
-  // "Os Três" na planilha = as três empresas, com o mesmo valor em cada.
+  // "Os Três" na planilha = as três empresas, mesmo valor em cada.
   {
     nome: 'Luiz',
     vinculos: [
@@ -158,90 +147,97 @@ async function main() {
 
   if (!emailAdmin || !senhaAdmin) {
     throw new Error(
-      'Defina SEED_ADMIN_EMAIL e SEED_ADMIN_SENHA no ambiente antes de rodar o seed.\n' +
-        'Exemplo (PowerShell):\n' +
-        '  $env:SEED_ADMIN_EMAIL="voce@empresa.com"; $env:SEED_ADMIN_SENHA="UmaSenhaForte123"; npm run db:seed',
+      'Defina SEED_ADMIN_EMAIL e SEED_ADMIN_SENHA antes de rodar.\n' +
+        'PowerShell:\n' +
+        '  $env:SEED_ADMIN_EMAIL="voce@empresa.com"; $env:SEED_ADMIN_SENHA="UmaSenhaForte123"; npm run seed',
     );
   }
 
   const problema = validarForcaSenha(senhaAdmin);
   if (problema) throw new Error(`Senha do admin recusada: ${problema}`);
 
-  console.log('→ Empresas');
-  const mapaEmpresa = new Map<string, string>();
-  for (const e of EMPRESAS) {
-    const [existente] = await db
-      .select({ id: empresas.id })
-      .from(empresas)
-      .where(eq(empresas.nome, e.nome))
-      .limit(1);
+  const agora = new Date().toISOString();
 
-    if (existente) {
-      mapaEmpresa.set(e.nome, existente.id);
-    } else {
-      const [nova] = await db.insert(empresas).values(e).returning({ id: empresas.id });
-      mapaEmpresa.set(e.nome, nova.id);
-    }
-  }
-  console.log(`  ${mapaEmpresa.size} empresas`);
+  const empresas = [
+    { id: randomUUID(), nome: MS, cor: '#16A891' },
+    { id: randomUUID(), nome: AI, cor: '#2F6F9E' },
+    { id: randomUUID(), nome: MO, cor: '#9C6A2E' },
+  ];
+  const idPorNome = new Map(empresas.map((e) => [e.nome, e.id]));
 
-  console.log('→ Usuário admin');
-  const email = emailAdmin.toLowerCase().trim();
-  const [jaExiste] = await db
-    .select({ id: usuarios.id })
-    .from(usuarios)
-    .where(eq(usuarios.email, email))
-    .limit(1);
-
-  if (jaExiste) {
-    console.log('  já existe, mantido como está');
-  } else {
-    await db.insert(usuarios).values({
-      email,
-      senhaHash: await hashSenha(senhaAdmin),
-      nome: 'Administrador',
-      papel: 'admin',
-      trocarSenha: true,
-    });
-    console.log(`  criado: ${email}`);
-  }
-
-  console.log('→ Colaboradores e vínculos');
-  let pessoasCriadas = 0;
-  let vinculosCriados = 0;
-
-  for (const pessoa of PESSOAS) {
-    const [existente] = await db
-      .select({ id: colaboradores.id })
-      .from(colaboradores)
-      .where(eq(colaboradores.nome, pessoa.nome))
-      .limit(1);
-
-    if (existente) continue;
-
-    const [nova] = await db
-      .insert(colaboradores)
-      .values({ nome: pessoa.nome })
-      .returning({ id: colaboradores.id });
-    pessoasCriadas++;
-
-    for (const v of pessoa.vinculos) {
-      const empresaId = mapaEmpresa.get(v.empresa);
+  const colaboradores: Colaborador[] = PESSOAS.map((p) => ({
+    id: randomUUID(),
+    nome: p.nome,
+    nascimento: null,
+    dataContratacao: null,
+    vinculos: p.vinculos.map((v) => {
+      const empresaId = idPorNome.get(v.empresa);
       if (!empresaId) throw new Error(`Empresa desconhecida: ${v.empresa}`);
-      await db.insert(vinculos).values({
-        colaboradorId: nova.id,
+      return {
+        id: randomUUID(),
         empresaId,
         cargo: v.cargo,
-        valorFixo: v.valor.toFixed(2),
-      });
-      vinculosCriados++;
-    }
+        valorFixoCentavos: reaisParaCentavos(v.valor),
+        ativo: true,
+      };
+    }),
+    ativo: true,
+    desligadoEm: null,
+    contrato: null,
+    avaliacoes: [],
+    criadoEm: agora,
+    atualizadoEm: agora,
+  }));
+
+  const base: BaseDados = {
+    versao: 1,
+    empresas,
+    usuarios: [
+      {
+        id: randomUUID(),
+        email: emailAdmin.toLowerCase().trim(),
+        senhaHash: await hashSenha(senhaAdmin),
+        nome: 'Administrador',
+        papel: 'admin',
+        ativo: true,
+        empresaIds: [],
+        mfaSecret: null,
+        trocarSenha: true,
+        ultimoLoginEm: null,
+        criadoEm: agora,
+      },
+    ],
+    colaboradores,
+  };
+
+  // Escreve direto no disco local. Em produção, o mesmo JSON é enviado ao
+  // Vercel Blob pela própria aplicação na primeira execução.
+  const destino = path.join(process.cwd(), '.data', 'dados', 'base.json');
+
+  try {
+    await fs.access(destino);
+    throw new Error(
+      `${destino} já existe. Apague-o antes de rodar o seed de novo — ' +
+      'rodar por cima apagaria dados já cadastrados.`,
+    );
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes('já existe')) throw e;
   }
 
-  const totalVinculos = PESSOAS.reduce((a, p) => a + p.vinculos.length, 0);
-  console.log(`  ${pessoasCriadas} pessoas, ${vinculosCriados} vínculos`);
-  console.log(`\n✓ Seed concluído. Esperado na planilha: ${PESSOAS.length} pessoas / ${totalVinculos} vínculos.`);
-  process.exit(0);
+  await fs.mkdir(path.dirname(destino), { recursive: true });
+  await fs.writeFile(destino, JSON.stringify(base, null, 2), 'utf8');
+
+  const totalVinculos = colaboradores.reduce((a, c) => a + c.vinculos.length, 0);
+  const folha = colaboradores
+    .flatMap((c) => c.vinculos)
+    .reduce((a, v) => a + v.valorFixoCentavos, 0);
+
+  console.log(`✓ Base criada em ${destino}`);
+  console.log(`  ${empresas.length} empresas`);
+  console.log(`  ${colaboradores.length} pessoas`);
+  console.log(`  ${totalVinculos} vínculos`);
+  console.log(`  folha fixa: ${(folha / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`);
+  console.log(`  admin: ${base.usuarios[0].email}`);
 }
 
 main().catch((e) => {

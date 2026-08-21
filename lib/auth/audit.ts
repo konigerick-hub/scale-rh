@@ -1,13 +1,18 @@
 import { headers } from 'next/headers';
-import { db } from '@/lib/db';
-import { auditLog } from '@/lib/db/schema';
+import { randomUUID } from 'node:crypto';
+import { escreverImutavel, listarChaves, lerTexto } from '@/lib/store/blob';
 
 /**
  * Registro de auditoria.
  *
- * A tabela é append-only por GRANT no banco (ver a migração `0001_audit_append_only.sql`):
- * o usuário da aplicação tem INSERT e SELECT, mas não UPDATE nem DELETE. Assim,
- * mesmo quem comprometer a aplicação não consegue apagar o próprio rastro.
+ * Cada evento é gravado como um arquivo próprio, com `allowOverwrite: false`.
+ * Isso torna os registros imutáveis: não é possível editar um evento já gravado.
+ *
+ * LIMITAÇÃO CONHECIDA: sem um banco recusando DELETE, um invasor com as
+ * credenciais da aplicação ainda consegue APAGAR eventos, embora não consiga
+ * alterá-los. Com Postgres dava para bloquear as duas coisas. Se a auditoria
+ * inviolável virar exigência (auditoria externa, exigência de cliente), este é
+ * o motivo para reconsiderar um banco de verdade.
  */
 
 export const Acao = {
@@ -38,6 +43,19 @@ export const Acao = {
 
 export type AcaoTipo = (typeof Acao)[keyof typeof Acao];
 
+export type EventoAuditoria = {
+  id: string;
+  ts: string;
+  acao: AcaoTipo;
+  usuarioId: string | null;
+  usuarioEmail: string | null;
+  entidade: string | null;
+  entidadeId: string | null;
+  ip: string | null;
+  userAgent: string | null;
+  metadata: Record<string, unknown> | null;
+};
+
 type Entrada = {
   acao: AcaoTipo;
   usuarioId?: string | null;
@@ -58,7 +76,10 @@ export async function ipDaRequisicao(): Promise<string> {
 export async function auditar(entrada: Entrada): Promise<void> {
   try {
     const h = await headers();
-    await db.insert(auditLog).values({
+    const agora = new Date();
+    const evento: EventoAuditoria = {
+      id: randomUUID(),
+      ts: agora.toISOString(),
       acao: entrada.acao,
       usuarioId: entrada.usuarioId ?? null,
       usuarioEmail: entrada.usuarioEmail ?? null,
@@ -67,10 +88,36 @@ export async function auditar(entrada: Entrada): Promise<void> {
       ip: await ipDaRequisicao(),
       userAgent: h.get('user-agent')?.slice(0, 500) ?? null,
       metadata: entrada.metadata ?? null,
-    });
+    };
+
+    // Caminho por dia, com timestamp no nome: a listagem sai em ordem
+    // cronológica sem precisar de índice.
+    const dia = evento.ts.slice(0, 10);
+    const chave = `auditoria/${dia}/${evento.ts.replace(/[:.]/g, '-')}-${evento.id}.json`;
+
+    await escreverImutavel(chave, JSON.stringify(evento));
   } catch (erro) {
-    // Falha de auditoria não pode derrubar a operação do usuário, mas precisa
-    // aparecer no log da plataforma para investigação.
+    // Falha de auditoria não pode derrubar a operação, mas precisa aparecer
+    // no log da plataforma para investigação.
     console.error('[auditoria] falha ao registrar', entrada.acao, erro);
   }
+}
+
+/** Lê os eventos de um dia (YYYY-MM-DD), em ordem cronológica. */
+export async function lerAuditoriaDoDia(dia: string): Promise<EventoAuditoria[]> {
+  const chaves = await listarChaves(`auditoria/${dia}`);
+  const eventos = await Promise.all(
+    chaves.map(async (c) => {
+      const lido = await lerTexto(c);
+      if (!lido) return null;
+      try {
+        return JSON.parse(lido.conteudo) as EventoAuditoria;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  return eventos
+    .filter((e): e is EventoAuditoria => e !== null)
+    .sort((a, b) => a.ts.localeCompare(b.ts));
 }

@@ -3,58 +3,47 @@
 Sistema interno do Grupo Scale (Mentoria Scale · Acelera Imob · Mundo Ótico) para
 cadastro de colaboradores, contratos assinados, remuneração e clima cultural.
 
-**Os dados são sensíveis** (salários, contratos com CPF/RG, avaliações nominais).
-Leia `SEGURANCA.md` antes de mexer na camada de autenticação ou autorização.
+**Os dados são sensíveis** — salários, contratos com CPF/RG, avaliações nominais.
+Leia `SEGURANCA.md` antes de mexer em `lib/auth/` ou `lib/store/`.
 
 ## Stack
 
 | Camada | Escolha | Por quê |
 |---|---|---|
 | App | Next.js 16 (App Router) na Vercel | Front e API no mesmo deploy |
-| Banco | Postgres gerenciado + Drizzle | Sem servidor pra administrar |
-| Auth | Próprio: Argon2id + JWT em cookie | Sem dependência de API externa |
-| Rate limit | Postgres | Memória não funciona em serverless |
-| PDFs | Storage privado + URL assinada | Nunca em bucket público |
+| Dados | Vercel Blob (privado), JSON | Sem conta nova, sem banco para administrar |
+| Auth | Próprio: Argon2id + JWT em cookie | Sem dependência de serviço externo |
+| Limite de tentativas | Arquivo por chave | Memória não funciona em serverless |
+
+**Não há banco relacional.** O cadastro inteiro é um documento JSON carregado em
+memória — adequado a 52 pessoas e 66 vínculos, inadequado a milhares. Se o
+volume crescer muito, ou se auditoria inviolável virar exigência formal, é hora
+de reconsiderar um banco de verdade (ver `SEGURANCA.md`).
 
 ## Rodando localmente
 
-**1. Variáveis de ambiente**
+Não precisa de banco, conta ou container. Os dados vão para `.data/` no projeto.
+
+**1. Segredo da sessão**
 
 ```bash
 cp .env.example .env.local
 ```
 
-Gere o segredo da sessão e cole em `SESSION_SECRET`:
+Gere e cole em `SESSION_SECRET`:
 
 ```bash
 openssl rand -base64 48
 ```
 
-**2. Banco**
-
-Aponte `DATABASE_URL` para um Postgres. Para desenvolvimento local com Docker:
-
-```bash
-docker run -d --name scale-pg -e POSTGRES_PASSWORD=dev -p 5432:5432 postgres:17
-```
-
-Nesse caso use `DATABASE_URL="postgresql://postgres:dev@localhost:5432/postgres"`
-e `DATABASE_SSL="disable"` (Postgres local não tem TLS).
-
-**3. Migrações**
-
-```bash
-npm run db:migrate
-```
-
-**4. Carga inicial** — 3 empresas, 52 colaboradores, 66 vínculos e o usuário admin.
+**2. Carga inicial** — 3 empresas, 52 pessoas, 66 vínculos e o usuário admin.
 No PowerShell:
 
 ```bash
-$env:SEED_ADMIN_EMAIL="voce@empresa.com"; $env:SEED_ADMIN_SENHA="UmaSenhaForte123"; npm run db:seed
+$env:SEED_ADMIN_EMAIL="voce@empresa.com"; $env:SEED_ADMIN_SENHA="UmaSenhaForte123"; npm run seed
 ```
 
-**5. Subir**
+**3. Subir**
 
 ```bash
 npm run dev
@@ -71,29 +60,24 @@ npm run typecheck
 ```
 
 ```bash
-npm run db:generate
-```
-
-```bash
-npm run db:migrate
-```
-
-```bash
-npm run db:seed
+npm run seed
 ```
 
 ## Modelo de dados
 
-Uma pessoa que atua em mais de uma empresa é **uma** linha em `colaboradores`
-com **N** linhas em `vinculos` — cada uma com sua empresa, cargo e valor:
+Quem atua em mais de uma empresa é **um** registro com **N** vínculos, cada um
+com sua empresa, cargo e valor:
 
 ```
 colaboradores (52)  ──<  vinculos (66)  >──  empresas (3)
 ```
 
 Victor Paredes, Luiz, Natalia, Vinicius G, Erick, Gabriel Souza, Lucas Fernandes,
-Kamila e Liz têm mais de um vínculo. Editar o nome de qualquer um deles muda em
-um lugar só.
+Kamila e Liz têm mais de um vínculo. Corrigir o nome de qualquer um muda em um
+lugar só.
+
+Valores monetários são guardados **em centavos** (inteiro), para não acumular
+erro de arredondamento de ponto flutuante.
 
 ## Papéis
 
@@ -103,7 +87,8 @@ um lugar só.
 | `gestor` | só suas empresas | sim | não | não |
 | `leitura` | só suas empresas | não | não | não |
 
-O escopo por empresa é aplicado **na consulta SQL** (`lib/queries/`), não na tela.
+O escopo por empresa é aplicado em `lib/queries/`, ao montar o resultado — nunca
+na tela.
 
 ## Estrutura
 
@@ -114,22 +99,27 @@ app/
   api/auth/           login e logout
 lib/
   auth/
-    session.ts        JWT (Edge-safe — não importa banco nem argon2)
+    session.ts        JWT (Edge-safe — não importa armazenamento nem argon2)
     password.ts       Argon2id (Node runtime apenas)
-    guard.ts          autorização de verdade: revalida no banco
-    rate-limit.ts     limite de tentativas via Postgres
-    audit.ts          registro de auditoria
-  db/schema.ts        tabelas
-  queries/            consultas com escopo por empresa aplicado no SQL
+    guard.ts          autorização de verdade: revalida a cada requisição
+    rate-limit.ts     limite de tentativas de login
+    audit.ts          registro de auditoria (um arquivo imutável por evento)
+  store/
+    tipos.ts          formato dos dados
+    blob.ts           Vercel Blob em produção, disco local no dev
+    dados.ts          carga e alteração com controle de concorrência
+  queries/            consultas com escopo por empresa aplicado
 proxy.ts              triagem na borda (não é a autorização)
-drizzle/              migrações versionadas
+.data/                dados locais de dev — nunca versionado
 ```
 
 ## Deploy na Vercel
 
 1. Suba o repositório no GitHub — **privado**
-2. Importe na Vercel
-3. Configure as variáveis do `.env.example` no painel da Vercel
-4. Rode as migrações apontando para o banco de produção
+2. Importe o projeto na Vercel
+3. No painel da Vercel, crie um **Blob Store em modo privado** e conecte ao projeto
+   — a Vercel injeta as credenciais sozinha e as rotaciona
+4. Adicione `SESSION_SECRET` nas variáveis de ambiente (um valor novo, não o do dev)
+5. Faça o primeiro acesso e cadastre os dados, ou envie o `base.json` gerado pelo seed
 
 Antes de considerar em produção, percorra o checklist em `SEGURANCA.md`.

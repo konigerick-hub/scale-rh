@@ -42,3 +42,6 @@ next-env.d.ts
 
 # manter o template de variaveis versionado
 !.env.example
+
+# dados locais de desenvolvimento - contem hash de senha, nunca versionar
+.data/

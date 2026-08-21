@@ -1,46 +1,96 @@
-import { and, eq, gte, sql } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { tentativasLogin } from '@/lib/db/schema';
+import 'server-only';
+import { createHash } from 'node:crypto';
+import { lerTexto, escreverTexto, ConflitoDeEscrita } from '@/lib/store/blob';
 
 /**
- * Rate limit de login com estado no Postgres.
+ * Limite de tentativas de login.
  *
- * Contador em memória não funciona em serverless: cada invocação pode ser um
+ * Contador em memória não funciona: cada requisição na Vercel pode rodar num
  * processo novo, então o contador zeraria e o limite nunca seria atingido.
- * O banco é o único estado compartilhado entre as instâncias.
+ * O estado precisa ser compartilhado — aqui, um arquivo por chave.
  */
 
-const JANELA_MINUTOS = 15;
+const JANELA_MS = 15 * 60_000;
 const MAX_POR_EMAIL = 5;
 const MAX_POR_IP = 20; // mais folgado: um escritório inteiro sai pelo mesmo IP
 
-export type Bloqueio = { bloqueado: true; esperarSegundos: number } | { bloqueado: false };
+export type Bloqueio =
+  | { bloqueado: true; esperarSegundos: number }
+  | { bloqueado: false };
 
-async function falhasRecentes(chave: string): Promise<number> {
-  const desde = new Date(Date.now() - JANELA_MINUTOS * 60_000);
-  const [linha] = await db
-    .select({ total: sql<number>`count(*)::int` })
-    .from(tentativasLogin)
-    .where(
-      and(
-        eq(tentativasLogin.chave, chave),
-        eq(tentativasLogin.sucesso, false),
-        gte(tentativasLogin.ts, desde),
-      ),
-    );
-  return linha?.total ?? 0;
+type Registro = { falhas: number[] };
+
+/**
+ * O nome do arquivo é o hash da chave, não a chave em si.
+ *
+ * Dois motivos: e-mail e IP em nome de arquivo apareceriam na listagem do
+ * armazenamento, entregando quais contas existem a quem tivesse acesso de
+ * leitura; e um IPv6 como `::1` contém `:`, que é inválido em nome de arquivo
+ * no Windows. O hash resolve os dois de uma vez.
+ */
+function chaveArquivo(bruta: string): string {
+  const h = createHash('sha256').update(bruta).digest('hex').slice(0, 32);
+  return `tentativas/${h}.json`;
+}
+
+async function lerFalhasRecentes(bruta: string): Promise<number[]> {
+  const lido = await lerTexto(chaveArquivo(bruta));
+  if (!lido) return [];
+  try {
+    const reg = JSON.parse(lido.conteudo) as Registro;
+    const corte = Date.now() - JANELA_MS;
+    return (reg.falhas ?? []).filter((t) => t > corte);
+  } catch {
+    return [];
+  }
 }
 
 export async function verificarBloqueio(email: string, ip: string): Promise<Bloqueio> {
   const [porEmail, porIp] = await Promise.all([
-    falhasRecentes(`email:${email}`),
-    falhasRecentes(`ip:${ip}`),
+    lerFalhasRecentes(`email:${email}`),
+    lerFalhasRecentes(`ip:${ip}`),
   ]);
 
-  if (porEmail >= MAX_POR_EMAIL || porIp >= MAX_POR_IP) {
-    return { bloqueado: true, esperarSegundos: JANELA_MINUTOS * 60 };
+  if (porEmail.length >= MAX_POR_EMAIL || porIp.length >= MAX_POR_IP) {
+    const maisAntiga = Math.min(
+      ...(porEmail.length >= MAX_POR_EMAIL ? porEmail : porIp),
+    );
+    const esperar = Math.ceil((maisAntiga + JANELA_MS - Date.now()) / 1000);
+    return { bloqueado: true, esperarSegundos: Math.max(esperar, 1) };
   }
   return { bloqueado: false };
+}
+
+async function registrarUma(bruta: string, sucesso: boolean): Promise<void> {
+  const chave = chaveArquivo(bruta);
+
+  if (sucesso) {
+    // Login correto limpa o histórico: quem lembrou a senha não deve continuar
+    // acumulando penalidade das tentativas anteriores.
+    await escreverTexto(chave, JSON.stringify({ falhas: [] } satisfies Registro));
+    return;
+  }
+
+  const corte = Date.now() - JANELA_MS;
+  const lido = await lerTexto(chave);
+  let falhas: number[] = [];
+  if (lido) {
+    try {
+      falhas = ((JSON.parse(lido.conteudo) as Registro).falhas ?? []).filter((t) => t > corte);
+    } catch {
+      falhas = [];
+    }
+  }
+  falhas.push(Date.now());
+
+  try {
+    await escreverTexto(chave, JSON.stringify({ falhas } satisfies Registro), lido?.etag);
+  } catch (erro) {
+    // Conflito aqui significa outra tentativa simultânea, que já contabilizou
+    // a dela. Perder esta contagem é aceitável e não afrouxa o limite de forma
+    // explorável — mas nunca deve derrubar o fluxo de login.
+    if (!(erro instanceof ConflitoDeEscrita)) throw erro;
+  }
 }
 
 export async function registrarTentativa(
@@ -48,14 +98,8 @@ export async function registrarTentativa(
   ip: string,
   sucesso: boolean,
 ): Promise<void> {
-  await db.insert(tentativasLogin).values([
-    { chave: `email:${email}`, sucesso },
-    { chave: `ip:${ip}`, sucesso },
+  await Promise.all([
+    registrarUma(`email:${email}`, sucesso),
+    registrarUma(`ip:${ip}`, sucesso),
   ]);
-}
-
-/** Limpa registros fora da janela. Chamado no login para não precisar de cron. */
-export async function limparTentativasAntigas(): Promise<void> {
-  const corte = new Date(Date.now() - 24 * 60 * 60_000);
-  await db.delete(tentativasLogin).where(sql`${tentativasLogin.ts} < ${corte}`);
 }

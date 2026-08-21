@@ -1,21 +1,17 @@
 import 'server-only';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { eq } from 'drizzle-orm';
-import { db } from '@/lib/db';
-import { usuarios, usuarioEmpresas } from '@/lib/db/schema';
-import { COOKIE_SESSAO, lerToken, type Papel } from './session';
+import { carregarBase } from '@/lib/store/dados';
+import type { Papel } from '@/lib/store/tipos';
+import { COOKIE_SESSAO, lerToken } from './session';
 
 /**
  * Autorização do lado do servidor.
  *
- * O middleware só confere a assinatura do JWT — é uma triagem barata, não a
- * autorização de verdade. TODA leitura de dado passa por aqui, que revalida o
- * usuário no banco a cada requisição. É isso que faz a desativação de um
- * usuário ter efeito imediato, sem precisar esperar o token expirar.
- *
- * `server-only` garante erro de build se este arquivo for importado por engano
- * em componente de cliente.
+ * O proxy só confere a assinatura do JWT — é triagem barata, não autorização.
+ * TODA leitura de dado passa por aqui, que recarrega o usuário do armazenamento
+ * a cada requisição. É isso que faz a desativação de alguém ter efeito imediato,
+ * sem esperar o token de 4 horas expirar.
  */
 
 export type UsuarioAutenticado = {
@@ -32,41 +28,21 @@ export async function sessaoAtual(): Promise<UsuarioAutenticado | null> {
   const sessao = await lerToken(jar.get(COOKIE_SESSAO)?.value);
   if (!sessao) return null;
 
-  // O token diz quem a pessoa era quando fez login. O banco diz quem ela é agora.
-  const [usuario] = await db
-    .select({
-      id: usuarios.id,
-      email: usuarios.email,
-      nome: usuarios.nome,
-      papel: usuarios.papel,
-      ativo: usuarios.ativo,
-    })
-    .from(usuarios)
-    .where(eq(usuarios.id, sessao.usuarioId))
-    .limit(1);
-
+  // O token diz quem a pessoa era ao entrar. O armazenamento diz quem ela é agora.
+  const { base } = await carregarBase();
+  const usuario = base.usuarios.find((u) => u.id === sessao.usuarioId);
   if (!usuario || !usuario.ativo) return null;
-
-  const empresasPermitidas =
-    usuario.papel === 'admin'
-      ? null
-      : (
-          await db
-            .select({ empresaId: usuarioEmpresas.empresaId })
-            .from(usuarioEmpresas)
-            .where(eq(usuarioEmpresas.usuarioId, usuario.id))
-        ).map((l) => l.empresaId);
 
   return {
     id: usuario.id,
     email: usuario.email,
     nome: usuario.nome,
     papel: usuario.papel,
-    empresasPermitidas,
+    empresasPermitidas: usuario.papel === 'admin' ? null : usuario.empresaIds,
   };
 }
 
-/** Use no topo de toda página protegida. Redireciona se não houver sessão válida. */
+/** Use no topo de toda página protegida. */
 export async function exigirSessao(): Promise<UsuarioAutenticado> {
   const usuario = await sessaoAtual();
   if (!usuario) redirect('/login');

@@ -1,15 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/lib/db';
-import { usuarios } from '@/lib/db/schema';
+import { carregarBase, alterarBase } from '@/lib/store/dados';
 import { verificarSenha, gastarTempoConstante } from '@/lib/auth/password';
 import { criarToken, COOKIE_SESSAO, opcoesCookie } from '@/lib/auth/session';
-import {
-  verificarBloqueio,
-  registrarTentativa,
-  limparTentativasAntigas,
-} from '@/lib/auth/rate-limit';
+import { verificarBloqueio, registrarTentativa } from '@/lib/auth/rate-limit';
 import { auditar, Acao } from '@/lib/auth/audit';
 
 // Argon2 é módulo nativo: precisa de Node runtime, não roda no Edge.
@@ -20,7 +14,7 @@ const schema = z.object({
   senha: z.string().min(1).max(200),
 });
 
-/** Mensagem única para credencial errada — dizer "e-mail não existe" entrega quais contas existem. */
+/** Mensagem única — dizer "e-mail não existe" entrega quais contas existem. */
 const CREDENCIAL_INVALIDA = 'E-mail ou senha incorretos.';
 
 export async function POST(req: NextRequest) {
@@ -41,7 +35,7 @@ export async function POST(req: NextRequest) {
   const email = parsed.data.email.toLowerCase().trim();
   const { senha } = parsed.data;
 
-  // 1) Rate limit antes de qualquer trabalho caro
+  // 1) Limite de tentativas antes de qualquer trabalho caro
   const bloqueio = await verificarBloqueio(email, ip);
   if (bloqueio.bloqueado) {
     await auditar({ acao: Acao.LOGIN_BLOQUEADO, usuarioEmail: email });
@@ -52,13 +46,10 @@ export async function POST(req: NextRequest) {
   }
 
   // 2) Buscar usuário
-  const [usuario] = await db
-    .select()
-    .from(usuarios)
-    .where(eq(usuarios.email, email))
-    .limit(1);
+  const { base } = await carregarBase();
+  const usuario = base.usuarios.find((u) => u.email === email);
 
-  // 3) Verificar senha — sempre gastando tempo comparável, exista o usuário ou não
+  // 3) Verificar senha — gastando tempo comparável exista o usuário ou não
   let ok = false;
   if (usuario && usuario.ativo) {
     ok = await verificarSenha(usuario.senhaHash, senha);
@@ -81,10 +72,10 @@ export async function POST(req: NextRequest) {
     papel: usuario.papel,
   });
 
-  await db
-    .update(usuarios)
-    .set({ ultimoLoginEm: new Date() })
-    .where(eq(usuarios.id, usuario.id));
+  await alterarBase((b) => {
+    const u = b.usuarios.find((x) => x.id === usuario.id);
+    if (u) u.ultimoLoginEm = new Date().toISOString();
+  });
 
   await auditar({
     acao: Acao.LOGIN_OK,
@@ -92,13 +83,7 @@ export async function POST(req: NextRequest) {
     usuarioEmail: usuario.email,
   });
 
-  // Faxina oportunista: evita depender de cron para limpar a tabela de tentativas.
-  limparTentativasAntigas().catch(() => {});
-
-  const res = NextResponse.json({
-    ok: true,
-    trocarSenha: usuario.trocarSenha,
-  });
+  const res = NextResponse.json({ ok: true, trocarSenha: usuario.trocarSenha });
   res.cookies.set(COOKIE_SESSAO, token, opcoesCookie);
   return res;
 }
