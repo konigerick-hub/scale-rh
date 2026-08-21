@@ -66,6 +66,78 @@ export async function listarColaboradores(
   return linhas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }
 
+export type PessoaAgrupada = {
+  id: string;
+  nome: string;
+  nascimento: string | null;
+  dataContratacao: string | null;
+  temContrato: boolean;
+  ultimaAvaliacao: { mes: string; classificacao: string; nota: number } | null;
+  vinculos: {
+    empresaId: string;
+    empresaNome: string;
+    empresaCor: string;
+    cargo: string;
+    valor: number;
+  }[];
+};
+
+/**
+ * Uma linha por pessoa, com os vínculos que este usuário pode ver.
+ *
+ * Um gestor que enxerga só uma empresa recebe a pessoa com apenas aquele
+ * vínculo — nem o cargo nem o salário das outras empresas saem daqui.
+ */
+export async function listarPessoas(
+  usuario: UsuarioAutenticado,
+): Promise<PessoaAgrupada[]> {
+  const { base } = await carregarBase();
+  const empresaPorId = new Map(base.empresas.map((e) => [e.id, e]));
+  const permitidas = usuario.empresasPermitidas;
+
+  const pessoas: PessoaAgrupada[] = [];
+
+  for (const c of base.colaboradores) {
+    if (!c.ativo) continue;
+
+    const vinculos = c.vinculos
+      .filter((v) => v.ativo)
+      .filter((v) => permitidas === null || permitidas.includes(v.empresaId))
+      .map((v) => {
+        const e = empresaPorId.get(v.empresaId);
+        return e
+          ? {
+              empresaId: e.id,
+              empresaNome: e.nome,
+              empresaCor: e.cor,
+              cargo: v.cargo,
+              valor: centavosParaReais(v.valorFixoCentavos),
+            }
+          : null;
+      })
+      .filter((v): v is NonNullable<typeof v> => v !== null);
+
+    // Sem vínculo visível, a pessoa inteira fica fora do resultado.
+    if (vinculos.length === 0) continue;
+
+    const ultima = [...c.avaliacoes].sort((a, b) => a.mes.localeCompare(b.mes)).pop();
+
+    pessoas.push({
+      id: c.id,
+      nome: c.nome,
+      nascimento: c.nascimento,
+      dataContratacao: c.dataContratacao,
+      temContrato: c.contrato !== null,
+      ultimaAvaliacao: ultima
+        ? { mes: ultima.mes, classificacao: ultima.classificacao, nota: Number(ultima.nota) }
+        : null,
+      vinculos,
+    });
+  }
+
+  return pessoas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
 export async function resumoFolha(usuario: UsuarioAutenticado) {
   const linhas = await listarColaboradores(usuario);
   return {
