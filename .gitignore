@@ -45,3 +45,6 @@ next-env.d.ts
 
 # dados locais de desenvolvimento - contem hash de senha, nunca versionar
 .data/
+
+.vercel
+.env*

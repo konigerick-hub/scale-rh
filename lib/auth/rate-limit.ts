@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { lerTexto, escreverTexto, ConflitoDeEscrita } from '@/lib/store/blob';
+import { lerTexto, escreverTexto } from '@/lib/store/blob';
 
 /**
  * Limite de tentativas de login.
@@ -83,14 +83,7 @@ async function registrarUma(bruta: string, sucesso: boolean): Promise<void> {
   }
   falhas.push(Date.now());
 
-  try {
-    await escreverTexto(chave, JSON.stringify({ falhas } satisfies Registro), lido?.etag);
-  } catch (erro) {
-    // Conflito aqui significa outra tentativa simultânea, que já contabilizou
-    // a dela. Perder esta contagem é aceitável e não afrouxa o limite de forma
-    // explorável — mas nunca deve derrubar o fluxo de login.
-    if (!(erro instanceof ConflitoDeEscrita)) throw erro;
-  }
+  await escreverTexto(chave, JSON.stringify({ falhas } satisfies Registro));
 }
 
 export async function registrarTentativa(

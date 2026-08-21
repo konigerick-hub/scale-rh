@@ -1,5 +1,5 @@
 import 'server-only';
-import { put, head, get, del, list, BlobPreconditionFailedError } from '@vercel/blob';
+import { put, head, get, del, list } from '@vercel/blob';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -24,16 +24,8 @@ export const modoArmazenamento = usandoBlob ? 'vercel-blob' : 'disco-local';
 
 const DIR_LOCAL = path.join(process.cwd(), '.data');
 
-/** ETag identifica a versão lida, para detectar escrita concorrente. */
-export type Lido = { conteudo: string; etag: string | null } | null;
+export type Lido = { conteudo: string } | null;
 
-/** Lançado quando outra pessoa alterou o dado entre a leitura e a escrita. */
-export class ConflitoDeEscrita extends Error {
-  constructor() {
-    super('O registro foi alterado por outra pessoa. Recarregue e tente de novo.');
-    this.name = 'ConflitoDeEscrita';
-  }
-}
 
 /* ------------------------------------------------------------------ *
  * Disco local
@@ -45,26 +37,15 @@ function caminhoLocal(chave: string) {
 
 async function lerLocal(chave: string): Promise<Lido> {
   try {
-    const arquivo = caminhoLocal(chave);
-    const [conteudo, stat] = await Promise.all([
-      fs.readFile(arquivo, 'utf8'),
-      fs.stat(arquivo),
-    ]);
-    // mtime em nanossegundos serve de ETag: muda a cada escrita.
-    return { conteudo, etag: String(stat.mtimeMs) };
+    return { conteudo: await fs.readFile(caminhoLocal(chave), 'utf8') };
   } catch {
     return null;
   }
 }
 
-async function escreverLocal(chave: string, conteudo: string, etag?: string | null) {
+async function escreverLocal(chave: string, conteudo: string) {
   const arquivo = caminhoLocal(chave);
   await fs.mkdir(path.dirname(arquivo), { recursive: true });
-
-  if (etag !== undefined && etag !== null) {
-    const atual = await lerLocal(chave);
-    if (atual && atual.etag !== etag) throw new ConflitoDeEscrita();
-  }
   await fs.writeFile(arquivo, conteudo, 'utf8');
 }
 
@@ -80,34 +61,33 @@ export async function lerTexto(chave: string): Promise<Lido> {
     // para dado que acabou de ser escrito.
     const res = await get(chave, { access: 'private', useCache: false });
     if (!res || res.statusCode !== 200) return null;
-    const conteudo = await new Response(res.stream).text();
-    return { conteudo, etag: res.blob.etag ?? null };
+    return { conteudo: await new Response(res.stream).text() };
   } catch {
     return null;
   }
 }
 
-export async function escreverTexto(
-  chave: string,
-  conteudo: string,
-  etag?: string | null,
-): Promise<void> {
-  if (!usandoBlob) return escreverLocal(chave, conteudo, etag);
+/**
+ * Escrita simples: a última gravação vence.
+ *
+ * Havia aqui uma escrita condicional por ETag para impedir que duas edições
+ * simultâneas se sobrescrevessem. Ela foi removida: arquivos acima de alguns KB
+ * voltam com ETag fraco, que o `If-Match` recusa, e isso derrubava todo login.
+ *
+ * O que se perde: se duas pessoas salvarem o MESMO colaborador no mesmo
+ * instante, a segunda gravação apaga a primeira, sem aviso. Com um punhado de
+ * pessoas usando, isso é raro; se o time crescer, vale reintroduzir a proteção.
+ */
+export async function escreverTexto(chave: string, conteudo: string): Promise<void> {
+  if (!usandoBlob) return escreverLocal(chave, conteudo);
 
-  try {
-    await put(chave, conteudo, {
-      access: 'private',
-      contentType: 'application/json; charset=utf-8',
-      allowOverwrite: true,
-      // Só grava se ninguém tiver alterado desde a leitura.
-      ...(etag ? { ifMatch: etag } : {}),
-      // Documento vivo: cache curto para não servir versão antiga.
-      cacheControlMaxAge: 0,
-    });
-  } catch (erro) {
-    if (erro instanceof BlobPreconditionFailedError) throw new ConflitoDeEscrita();
-    throw erro;
-  }
+  await put(chave, conteudo, {
+    access: 'private',
+    contentType: 'application/json; charset=utf-8',
+    allowOverwrite: true,
+    // Documento vivo: sem cache, para não servir versão antiga.
+    cacheControlMaxAge: 0,
+  });
 }
 
 /**
