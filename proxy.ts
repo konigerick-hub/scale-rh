@@ -26,6 +26,11 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Protege tudo, menos login, arquivos estáticos e o endpoint de autenticação.
-  matcher: ['/((?!login|api/auth|_next/static|_next/image|favicon.ico).*)'],
+  // Protege tudo, menos login, primeira configuração, arquivos estáticos e o
+  // endpoint de autenticação.
+  //
+  // `/setup` fica de fora porque no primeiro acesso não existe conta para
+  // autenticar — quem barra o acesso indevido lá é a própria ação, que recusa
+  // assim que existir qualquer usuário cadastrado.
+  matcher: ['/((?!login|setup|api/auth|_next/static|_next/image|favicon.ico).*)'],
 };
