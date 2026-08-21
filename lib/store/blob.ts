@@ -158,6 +158,46 @@ export async function lerBinario(chave: string): Promise<Buffer | null> {
   }
 }
 
+/**
+ * Lê só os primeiros bytes de um arquivo.
+ *
+ * Usado para conferir a assinatura de um PDF sem baixar 20 MB: o stream é
+ * cancelado após a primeira porção.
+ */
+export async function lerInicio(chave: string, nBytes: number): Promise<Buffer | null> {
+  if (!usandoBlob) {
+    const bin = await lerBinario(chave);
+    return bin ? bin.subarray(0, nBytes) : null;
+  }
+  try {
+    const res = await get(chave, { access: 'private', useCache: false });
+    if (!res || res.statusCode !== 200) return null;
+
+    const leitor = res.stream.getReader();
+    const { value } = await leitor.read();
+    await leitor.cancel().catch(() => {});
+    return value ? Buffer.from(value.subarray(0, nBytes)) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Metadados do arquivo (tamanho, tipo) sem baixar o conteúdo. */
+export async function metadados(
+  chave: string,
+): Promise<{ tamanho: number; contentType: string } | null> {
+  if (!usandoBlob) {
+    const bin = await lerBinario(chave);
+    return bin ? { tamanho: bin.length, contentType: 'application/pdf' } : null;
+  }
+  try {
+    const h = await head(chave);
+    return { tamanho: h.size, contentType: h.contentType };
+  } catch {
+    return null;
+  }
+}
+
 export async function remover(chave: string): Promise<void> {
   if (!usandoBlob) {
     await fs.rm(caminhoLocal(chave), { force: true });

@@ -1,6 +1,8 @@
 import { exigirSessao, podeVerContrato, podeExportar } from '@/lib/auth/guard';
 import { listarColaboradores, resumoFolha } from '@/lib/queries/colaboradores';
+import { modoArmazenamento } from '@/lib/store/blob';
 import BotaoSair from './botao-sair';
+import Contrato from './contrato';
 
 // Dado sensível nunca deve ser cacheado ou pré-renderizado estaticamente.
 export const dynamic = 'force-dynamic';
@@ -72,7 +74,14 @@ export default async function Painel() {
                     {brl.format(Number(l.valorFixo))}
                   </td>
                   {podeVerContrato(usuario) && (
-                    <td className="px-4 py-3 text-neutral-400">—</td>
+                    <td className="px-4 py-3">
+                      <Contrato
+                        colaboradorId={l.colaboradorId}
+                        colaboradorNome={l.nome}
+                        temContrato={l.temContrato}
+                        envioDireto={modoArmazenamento === 'vercel-blob'}
+                      />
+                    </td>
                   )}
                 </tr>
               ))}
