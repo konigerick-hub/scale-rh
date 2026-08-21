@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import type { PessoaAgrupada } from '@/lib/queries/colaboradores';
-import ColaboradorForm, { type EmpresaOpcao, type ColaboradorEdicao } from './colaborador-form';
+import ColaboradorForm, { type EmpresaOpcao, type ColaboradorEdicao, DOCS_VAZIOS } from './colaborador-form';
+import GerarContrato, { type ModeloOpcao } from './gerar-contrato';
 import AvaliacaoForm from './avaliacao-form';
 import Contrato from './contrato';
 
@@ -34,6 +35,7 @@ type Props = {
   podeEditar: boolean;
   podeVerContrato: boolean;
   envioDireto: boolean;
+  modelos: ModeloOpcao[];
 };
 
 export default function Tabela({
@@ -42,12 +44,14 @@ export default function Tabela({
   podeEditar,
   podeVerContrato,
   envioDireto,
+  modelos,
 }: Props) {
   const [busca, setBusca] = useState('');
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
   const [editando, setEditando] = useState<ColaboradorEdicao | null>(null);
   const [criando, setCriando] = useState(false);
   const [avaliando, setAvaliando] = useState<{ id: string; nome: string } | null>(null);
+  const [gerando, setGerando] = useState<PessoaAgrupada | null>(null);
 
   const filtradas = useMemo(() => {
     const t = busca.trim().toLowerCase();
@@ -74,6 +78,7 @@ export default function Tabela({
         cargo: v.cargo,
         valor: v.valor,
       })),
+      documentos: p.documentos ?? DOCS_VAZIOS,
     });
   }
 
@@ -244,12 +249,20 @@ export default function Tabela({
 
                       {podeVerContrato && (
                         <td data-rotulo="Contrato">
-                          <Contrato
-                            colaboradorId={p.id}
-                            colaboradorNome={p.nome}
-                            temContrato={p.temContrato}
-                            envioDireto={envioDireto}
-                          />
+                          <div className="flex flex-col items-end gap-1 md:items-start">
+                            <Contrato
+                              colaboradorId={p.id}
+                              colaboradorNome={p.nome}
+                              temContrato={p.temContrato}
+                              envioDireto={envioDireto}
+                            />
+                            <button
+                              onClick={() => setGerando(p)}
+                              className="btn btn-secundario btn-mini"
+                            >
+                              gerar contrato
+                            </button>
+                          </div>
                         </td>
                       )}
 
@@ -284,7 +297,22 @@ export default function Tabela({
         <ColaboradorForm
           empresas={empresas}
           inicial={editando}
+          podeVerDocumentos={podeVerContrato}
           aoFechar={() => { setCriando(false); setEditando(null); }}
+        />
+      )}
+
+      {gerando && (
+        <GerarContrato
+          colaboradorId={gerando.id}
+          colaboradorNome={gerando.nome}
+          modelos={modelos}
+          vinculos={gerando.vinculos.map((v) => ({
+            id: v.vinculoId,
+            empresaNome: v.empresaNome,
+            cargo: v.cargo,
+          }))}
+          aoFechar={() => setGerando(null)}
         />
       )}
 

@@ -40,6 +40,14 @@ export const Acao = {
   DADOS_EXPORTAR: 'dados.exportar',
 
   AVALIACAO_CRIAR: 'avaliacao.criar',
+
+  /** Modelo de contrato define o texto que vai ser assinado. */
+  MODELO_SALVAR: 'modelo.salvar',
+  MODELO_REMOVER: 'modelo.remover',
+
+  /** CPF, RG e endereco sao dados pessoais: alteracao e acesso ficam registrados. */
+  DOCUMENTOS_EDITAR: 'documentos.editar',
+  CONTRATO_GERAR: 'contrato.gerar',
   USUARIO_CRIAR: 'usuario.criar',
   USUARIO_DESATIVAR: 'usuario.desativar',
 } as const;

@@ -10,6 +10,7 @@ import { modoArmazenamento } from '@/lib/store/blob';
 import BotaoSair from './botao-sair';
 import Conta from './conta';
 import Tabela from './tabela';
+import { carregarBase } from '@/lib/store/dados';
 
 // Dado sensível nunca deve ser pré-renderizado nem cacheado.
 export const dynamic = 'force-dynamic';
@@ -30,10 +31,11 @@ export default async function Painel({
   // `exigirPapel` devolve para cá com ?erro=sem-permissao; sem ler o parâmetro,
   // a pessoa era jogada de volta sem entender por quê.
   const { erro } = await searchParams;
-  const [pessoas, resumo, empresas] = await Promise.all([
-    listarPessoas(usuario),
+  const [pessoas, resumo, empresas, { base }] = await Promise.all([
+    listarPessoas(usuario, podeVerContrato(usuario)),
     resumoFolha(usuario),
     empresasVisiveis(usuario),
+    carregarBase(),
   ]);
 
   const semData = pessoas.filter((p) => !p.dataContratacao).length;
@@ -57,10 +59,18 @@ export default async function Painel({
               <span className="mx-1.5 opacity-40">·</span>
               <span className="text-[var(--accent)]">{usuario.papel}</span>
             </span>
+            <Link href="/painel/dashboard" className="btn btn-secundario btn-mini">
+              Indicadores
+            </Link>
             {podeGerenciarUsuarios(usuario) && (
-              <Link href="/painel/usuarios" className="btn btn-secundario btn-mini">
-                Usuários
-              </Link>
+              <>
+                <Link href="/painel/modelos" className="btn btn-secundario btn-mini">
+                  Modelos
+                </Link>
+                <Link href="/painel/usuarios" className="btn btn-secundario btn-mini">
+                  Usuários
+                </Link>
+              </>
             )}
             <Conta precisaTrocar={usuario.trocarSenha} />
             <BotaoSair />
@@ -104,6 +114,7 @@ export default async function Painel({
           podeEditar={podeEditar(usuario)}
           podeVerContrato={podeVerContrato(usuario)}
           envioDireto={modoArmazenamento === 'vercel-blob'}
+        modelos={podeVerContrato(usuario) ? (base.modelos ?? []).map((m) => ({ id: m.id, nome: m.nome })) : []}
         />
       </main>
     </>

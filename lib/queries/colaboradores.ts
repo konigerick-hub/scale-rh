@@ -74,12 +74,17 @@ export type PessoaAgrupada = {
   temContrato: boolean;
   ultimaAvaliacao: { mes: string; classificacao: string; nota: number } | null;
   vinculos: {
+    vinculoId: string;
     empresaId: string;
     empresaNome: string;
     empresaCor: string;
     cargo: string;
     valor: number;
   }[];
+  /** Só preenchido para quem pode ver contrato; senão vem null. */
+  documentos: {
+    cpf: string; rg: string; nacionalidade: string; estadoCivil: string; endereco: string;
+  } | null;
 };
 
 /**
@@ -90,6 +95,7 @@ export type PessoaAgrupada = {
  */
 export async function listarPessoas(
   usuario: UsuarioAutenticado,
+  incluirDocumentos = false,
 ): Promise<PessoaAgrupada[]> {
   const { base } = await carregarBase();
   const empresaPorId = new Map(base.empresas.map((e) => [e.id, e]));
@@ -107,6 +113,7 @@ export async function listarPessoas(
         const e = empresaPorId.get(v.empresaId);
         return e
           ? {
+              vinculoId: v.id,
               empresaId: e.id,
               empresaNome: e.nome,
               empresaCor: e.cor,
@@ -128,6 +135,15 @@ export async function listarPessoas(
       nascimento: c.nascimento,
       dataContratacao: c.dataContratacao,
       temContrato: c.contrato !== null,
+      documentos: incluirDocumentos
+        ? {
+            cpf: c.documentos?.cpf ?? '',
+            rg: c.documentos?.rg ?? '',
+            nacionalidade: c.documentos?.nacionalidade ?? '',
+            estadoCivil: c.documentos?.estadoCivil ?? '',
+            endereco: c.documentos?.endereco ?? '',
+          }
+        : null,
       ultimaAvaliacao: ultima
         ? { mes: ultima.mes, classificacao: ultima.classificacao, nota: Number(ultima.nota) }
         : null,

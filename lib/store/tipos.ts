@@ -44,6 +44,58 @@ export type Vinculo = {
   ativo: boolean;
 };
 
+/**
+ * Modelo de contrato: texto com marcadores que sao trocados pelos dados da
+ * pessoa na hora de gerar o PDF. Os marcadores disponiveis estao em
+ * MARCADORES, abaixo.
+ */
+export type ModeloContrato = {
+  id: string;
+  nome: string;
+  conteudo: string;
+  criadoEm: string;
+  atualizadoEm: string;
+};
+
+/** Marcadores aceitos no texto do modelo, e o que cada um vira. */
+export const MARCADORES: { chave: string; descricao: string }[] = [
+  { chave: 'nome', descricao: 'Nome do colaborador' },
+  { chave: 'cpf', descricao: 'CPF' },
+  { chave: 'rg', descricao: 'RG' },
+  { chave: 'nacionalidade', descricao: 'Nacionalidade' },
+  { chave: 'estadoCivil', descricao: 'Estado civil' },
+  { chave: 'endereco', descricao: 'Endereco completo' },
+  { chave: 'empresa', descricao: 'Empresa do vinculo' },
+  { chave: 'cargo', descricao: 'Cargo no vinculo' },
+  { chave: 'salario', descricao: 'Remuneracao formatada, ex: R$ 2.500,00' },
+  { chave: 'dataAdmissao', descricao: 'Data de admissao, ex: 01/03/2026' },
+  { chave: 'nascimento', descricao: 'Data de nascimento' },
+  { chave: 'hoje', descricao: 'Data de hoje por extenso' },
+];
+
+/** Dados pessoais usados para preencher o contrato. Sensiveis: so admin ve. */
+export type Documentos = {
+  cpf: string | null;
+  rg: string | null;
+  nacionalidade: string | null;
+  estadoCivil: string | null;
+  endereco: string | null;
+};
+
+export const DOCUMENTOS_VAZIOS: Documentos = {
+  cpf: null, rg: null, nacionalidade: null, estadoCivil: null, endereco: null,
+};
+
+/** Arquivo de apoio enviado junto do cadastro (copia de RG, comprovante etc). */
+export type Anexo = {
+  id: string;
+  caminho: string;
+  nomeArquivo: string;
+  tamanhoBytes: number;
+  enviadoPor: string;
+  enviadoEm: string;
+};
+
 export type Colaborador = {
   id: string;
   nome: string;
@@ -63,6 +115,10 @@ export type Colaborador = {
     enviadoPor: string;
     enviadoEm: string;
   } | null;
+  /** Dados pessoais para o contrato. Ausente em registros antigos. */
+  documentos?: Documentos;
+  /** Documentos de apoio (RG, comprovante de endereco...). */
+  anexos?: Anexo[];
   avaliacoes: {
     mes: string;
     classificacao: Clima;
@@ -80,6 +136,8 @@ export type BaseDados = {
   empresas: Empresa[];
   usuarios: Usuario[];
   colaboradores: Colaborador[];
+  /** Ausente em bases criadas antes desta funcionalidade. */
+  modelos?: ModeloContrato[];
 };
 
 export const BASE_VAZIA: BaseDados = {

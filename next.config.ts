@@ -60,6 +60,14 @@ const nextConfig: NextConfig = {
   // Não anuncia a versão do Next para quem está sondando o servidor.
   poweredByHeader: false,
 
+  /*
+   * O pdfkit lê arquivos de métrica de fonte (.afm) do próprio node_modules em
+   * tempo de execução. Empacotado pelo Next, o caminho quebra e a geração de
+   * contrato falha com ENOENT. Mantendo-o externo, ele resolve os arquivos
+   * normalmente — e o rastreamento de dependências os leva junto no deploy.
+   */
+  serverExternalPackages: ['pdfkit'],
+
   // Trata erro de tipo como erro de build: um `any` mal colocado na camada de
   // autorização é exatamente o tipo de bug que não pode chegar em produção.
   typescript: { ignoreBuildErrors: false },

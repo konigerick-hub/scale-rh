@@ -10,6 +10,8 @@ import { auditar, Acao } from '@/lib/auth/audit';
 import { removerContrato } from '@/lib/contratos';
 
 export type Resultado = { ok: true } | { ok: false; erro: string };
+/** Devolve o id para que a tela consiga salvar os documentos logo em seguida. */
+export type ResultadoComId = { ok: true; id: string } | { ok: false; erro: string };
 
 const dataOpcional = z
   .string()
@@ -48,7 +50,7 @@ function conferirEscopo(
 export async function salvarColaborador(
   id: string | null,
   entrada: EntradaColaborador,
-): Promise<Resultado> {
+): Promise<ResultadoComId> {
   const usuario = await exigirSessao();
   if (!podeEditar(usuario)) return { ok: false, erro: 'Sem permissão para editar.' };
 
@@ -69,6 +71,7 @@ export async function salvarColaborador(
 
   const agora = new Date().toISOString();
   let erro: string | null = null;
+  let idFinal = id;
   const alteracoesDeValor: { cargo: string; de: number; para: number }[] = [];
   const removidos: { empresaId: string; cargo: string; valor: number }[] = [];
 
@@ -167,6 +170,7 @@ export async function salvarColaborador(
         atualizadoEm: agora,
       };
       base.colaboradores.push(novo);
+      idFinal = novo.id;
     }
   });
 
@@ -205,7 +209,7 @@ export async function salvarColaborador(
   }
 
   revalidatePath('/painel');
-  return { ok: true };
+  return { ok: true, id: idFinal! };
 }
 
 /**
