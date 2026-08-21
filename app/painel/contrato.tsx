@@ -74,14 +74,14 @@ export default function Contrato({
   }
 
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-end gap-1 md:items-start">
       <div className="flex items-center gap-2">
         {temContrato && (
           <a
             href={`/api/contratos/${colaboradorId}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="rounded border border-teal-700 bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-800 hover:bg-teal-100"
+            className="btn btn-mini" style={{background:'var(--accent-wash)',color:'var(--accent-ink)',borderColor:'color-mix(in srgb, var(--accent) 40%, transparent)'}}
           >
             ver PDF
           </a>
@@ -90,7 +90,7 @@ export default function Contrato({
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={enviando}
-          className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+          className="btn btn-secundario btn-mini"
         >
           {enviando ? 'enviando…' : temContrato ? 'substituir' : 'enviar PDF'}
         </button>
@@ -105,7 +105,7 @@ export default function Contrato({
         aria-label={`Contrato de ${colaboradorNome}`}
       />
 
-      {erro && <span className="max-w-52 text-xs text-red-700">{erro}</span>}
+      {erro && <span className="max-w-52 text-xs text-[var(--danger)]">{erro}</span>}
     </div>
   );
 }

@@ -19,9 +19,8 @@ type Props = {
   aoFechar: () => void;
 };
 
-const campo =
-  'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600';
-const rotulo = 'block text-xs font-medium uppercase tracking-wide text-neutral-600 mb-1';
+const campo = 'campo';
+const rotulo = 'campo-rotulo';
 
 export default function ColaboradorForm({ empresas, inicial, aoFechar }: Props) {
   const [nome, setNome] = useState(inicial?.nome ?? '');
@@ -72,14 +71,14 @@ export default function ColaboradorForm({ empresas, inicial, aoFechar }: Props) 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-neutral-900/40 p-4 sm:p-8"
+      className="overlay"
       onClick={(e) => { if (e.target === e.currentTarget) aoFechar(); }}
     >
       <form
         onSubmit={enviar}
-        className="w-full max-w-lg rounded-lg border border-neutral-200 bg-white p-6 shadow-lg"
+        className="modal max-w-lg"
       >
-        <h2 className="mb-5 text-lg font-semibold text-neutral-900">
+        <h2 className="mb-5 text-lg font-semibold tracking-tight">
           {inicial ? 'Editar colaborador' : 'Novo colaborador'}
         </h2>
 
@@ -107,7 +106,7 @@ export default function ColaboradorForm({ empresas, inicial, aoFechar }: Props) 
             <span className={rotulo}>Empresas e remuneração</span>
 
             {vinculos.map((v, i) => (
-              <div key={i} className="flex flex-col gap-2 rounded-md border border-neutral-200 bg-neutral-50 p-3">
+              <div key={i} className="flex flex-col gap-2 rounded-[var(--radius-sm)] border border-[var(--line)] bg-[var(--surface-2)] p-3">
                 <div className="flex items-center gap-2">
                   <select
                     className={campo}
@@ -122,7 +121,7 @@ export default function ColaboradorForm({ empresas, inicial, aoFechar }: Props) 
                   {vinculos.length > 1 && (
                     <button type="button" aria-label="Remover empresa"
                       onClick={() => setVinculos((x) => x.filter((_, j) => j !== i))}
-                      className="shrink-0 rounded border border-neutral-300 px-2 py-2 text-xs text-neutral-600 hover:bg-white">
+                      className="btn btn-secundario btn-mini shrink-0">
                       remover
                     </button>
                   )}
@@ -145,35 +144,35 @@ export default function ColaboradorForm({ empresas, inicial, aoFechar }: Props) 
                   const livre = empresas.find((e) => !vinculos.some((v) => v.empresaId === e.id));
                   if (livre) setVinculos((v) => [...v, { empresaId: livre.id, cargo: '', valor: 0 }]);
                 }}
-                className="self-start rounded-md border border-dashed border-neutral-300 px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50">
+                className="btn btn-secundario btn-mini self-start border-dashed">
                 + outra empresa
               </button>
             )}
-            <p className="text-xs text-neutral-500">
+            <p className="text-xs text-[var(--ink-3)]">
               Quem atua em mais de uma empresa recebe um vínculo por empresa, cada um com seu valor.
             </p>
           </div>
         </div>
 
         {erro && (
-          <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>
+          <p role="alert" className="aviso-erro mt-4">{erro}</p>
         )}
 
         <div className="mt-6 flex items-center justify-between gap-3">
           {inicial ? (
             <button type="button" onClick={desligar} disabled={salvando}
-              className="rounded-md border border-red-300 px-3 py-2 text-sm text-red-700 hover:bg-red-50 disabled:opacity-50">
+              className="btn btn-perigo">
               Desligar
             </button>
           ) : <span />}
 
           <div className="flex gap-2">
             <button type="button" onClick={aoFechar} disabled={salvando}
-              className="rounded-md border border-neutral-300 px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50">
+              className="btn btn-secundario">
               Cancelar
             </button>
             <button type="submit" disabled={salvando}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+              className="btn btn-primario">
               {salvando ? 'Salvando…' : 'Salvar'}
             </button>
           </div>

@@ -14,9 +14,8 @@ type Usuario = {
   ultimoLoginEm: string | null;
 };
 
-const campo =
-  'w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600';
-const rotulo = 'block text-xs font-medium uppercase tracking-wide text-neutral-600 mb-1';
+const campo = 'campo';
+const rotulo = 'campo-rotulo';
 
 const PAPEL_DESC: Record<string, string> = {
   admin: 'vê tudo, gerencia contas e contratos',
@@ -69,14 +68,14 @@ export default function GerenciarUsuarios({
       <div className="mb-4 flex justify-end">
         <button
           onClick={() => setAberto((v) => !v)}
-          className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800"
+          className="btn btn-primario"
         >
           {aberto ? 'Cancelar' : '+ Novo usuário'}
         </button>
       </div>
 
       {aberto && (
-        <form onSubmit={criar} className="mb-6 rounded-lg border border-neutral-200 bg-neutral-50 p-5">
+        <form onSubmit={criar} className="cartao mb-6 bg-[var(--surface-2)] p-5">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className={rotulo} htmlFor="u-nome">Nome</label>
@@ -96,14 +95,14 @@ export default function GerenciarUsuarios({
                 <option value="gestor">Gestor</option>
                 <option value="admin">Administrador</option>
               </select>
-              <p className="mt-1 text-xs text-neutral-500">{PAPEL_DESC[papel]}</p>
+              <p className="mt-1 text-xs text-[var(--ink-3)]">{PAPEL_DESC[papel]}</p>
             </div>
             <div>
               <label className={rotulo} htmlFor="u-senha">Senha inicial</label>
               <input id="u-senha" type="text" className={campo} value={senha}
                 onChange={(e) => setSenha(e.target.value)} required
                 placeholder="mín. 12 caracteres, maiúscula e número" />
-              <p className="mt-1 text-xs text-neutral-500">
+              <p className="mt-1 text-xs text-[var(--ink-3)]">
                 Será exigida a troca no primeiro acesso.
               </p>
             </div>
@@ -114,7 +113,7 @@ export default function GerenciarUsuarios({
               <span className={rotulo}>Empresas que esta pessoa poderá ver</span>
               <div className="flex flex-wrap gap-3">
                 {empresas.map((e) => (
-                  <label key={e.id} className="flex items-center gap-2 text-sm text-neutral-700">
+                  <label key={e.id} className="flex items-center gap-2 text-sm text-[var(--ink-2)]">
                     <input
                       type="checkbox"
                       checked={empresaIds.includes(e.id)}
@@ -131,11 +130,11 @@ export default function GerenciarUsuarios({
             </div>
           )}
 
-          {erro && <p role="alert" className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>}
+          {erro && <p role="alert" className="aviso-erro mt-4">{erro}</p>}
 
           <div className="mt-5 flex justify-end">
             <button type="submit" disabled={pendente}
-              className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-50">
+              className="btn btn-primario">
               {pendente ? 'Criando…' : 'Criar usuário'}
             </button>
           </div>
@@ -143,48 +142,48 @@ export default function GerenciarUsuarios({
       )}
 
       {erro && !aberto && (
-        <p role="alert" className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{erro}</p>
+        <p role="alert" className="aviso-erro mb-4">{erro}</p>
       )}
 
-      <div className="overflow-x-auto rounded-lg border border-neutral-200">
-        <table className="w-full text-sm">
-          <thead className="bg-neutral-50 text-left text-xs uppercase tracking-wide text-neutral-500">
+      <div className="tabela-envolucro tabela-rolagem">
+        <table className="dados">
+          <thead>
             <tr>
-              <th className="px-4 py-3 font-medium">Pessoa</th>
-              <th className="px-4 py-3 font-medium">Papel</th>
-              <th className="px-4 py-3 font-medium">Empresas</th>
-              <th className="px-4 py-3 font-medium">Último acesso</th>
-              <th className="px-4 py-3" />
+              <th>Pessoa</th>
+              <th>Papel</th>
+              <th>Empresas</th>
+              <th>Último acesso</th>
+              <th aria-label="Ações" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-neutral-100">
+          <tbody>
             {usuarios.map((u) => (
               <tr key={u.id} className={u.ativo ? '' : 'opacity-50'}>
-                <td className="px-4 py-3">
-                  <div className="font-medium text-neutral-900">{u.nome}</div>
-                  <div className="text-xs text-neutral-500">{u.email}</div>
+                <td data-rotulo="Pessoa">
+                  <div className="font-medium text-[var(--ink)]">{u.nome}</div>
+                  <div className="text-xs text-[var(--ink-3)]">{u.email}</div>
                 </td>
-                <td className="px-4 py-3 text-neutral-600">{u.papel}</td>
-                <td className="px-4 py-3 text-xs text-neutral-600">
+                <td data-rotulo="Papel">{u.papel}</td>
+                <td data-rotulo="Empresas" className="text-xs">
                   {u.papel === 'admin'
                     ? 'todas'
                     : u.empresaIds.length
                       ? u.empresaIds.map(nomeEmpresa).join(', ')
                       : 'nenhuma'}
                 </td>
-                <td className="px-4 py-3 text-xs text-neutral-500">
+                <td data-rotulo="Último acesso" className="text-xs text-[var(--ink-3)]">
                   {u.ultimoLoginEm
                     ? new Date(u.ultimoLoginEm).toLocaleString('pt-BR')
                     : 'nunca entrou'}
                 </td>
-                <td className="px-4 py-3 text-right">
+                <td data-rotulo="Ação" className="text-right">
                   {u.id === eu ? (
-                    <span className="text-xs text-neutral-400">você</span>
+                    <span className="text-xs text-[var(--ink-3)]">você</span>
                   ) : (
                     <button
                       onClick={() => alternar(u)}
                       disabled={pendente}
-                      className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-50"
+                      className="btn btn-secundario btn-mini"
                     >
                       {u.ativo ? 'desativar' : 'reativar'}
                     </button>

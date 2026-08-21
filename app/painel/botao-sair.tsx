@@ -18,7 +18,7 @@ export default function BotaoSair() {
     <button
       onClick={sair}
       disabled={saindo}
-      className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-50 disabled:opacity-50"
+      className="btn btn-secundario btn-mini"
     >
       {saindo ? 'Saindo…' : 'Sair'}
     </button>

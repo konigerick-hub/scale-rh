@@ -13,13 +13,13 @@ export default async function PaginaUsuarios() {
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-10">
       <header className="mb-8">
-        <Link href="/painel" className="text-sm text-neutral-500 hover:text-neutral-900">
+        <Link href="/painel" className="text-sm text-[var(--ink-3)] hover:text-[var(--ink)]">
           ← Voltar ao painel
         </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-neutral-900">
+        <h1 className="mt-2 text-2xl font-semibold tracking-tight">
           Usuários
         </h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="mt-1 text-sm text-[var(--ink-3)]">
           Cada pessoa tem sua conta. Contas compartilhadas impedem saber quem acessou o quê.
         </p>
       </header>

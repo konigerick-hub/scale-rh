@@ -30,7 +30,8 @@ function FormularioLogin() {
 
       // Só aceita destino interno — `proximo` vem da URL e não é confiável.
       const proximo = params.get('proximo');
-      const destino = proximo?.startsWith('/') && !proximo.startsWith('//') ? proximo : '/painel';
+      const destino =
+        proximo?.startsWith('/') && !proximo.startsWith('//') ? proximo : '/painel';
       router.push(destino);
       router.refresh();
     } catch {
@@ -41,63 +42,59 @@ function FormularioLogin() {
   }
 
   return (
-    <form onSubmit={enviar} className="w-full max-w-sm space-y-5">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">
-          Grupo Scale
+    <form onSubmit={enviar} className="w-full max-w-[22rem]">
+      <div className="mb-7">
+        <div className="marca mb-6 text-lg">
+          Grupo <span>Scale</span>
+        </div>
+        <h1 className="text-[1.6rem] font-semibold leading-tight tracking-tight text-[var(--ink)]">
+          Contratos &amp; Cargos
         </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Painel de colaboradores — acesso restrito
+        <p className="mt-1.5 text-sm text-[var(--ink-3)]">
+          Painel de colaboradores · acesso restrito
         </p>
       </div>
 
-      <div className="space-y-3">
+      <div className="flex flex-col gap-4">
         <div>
-          <label htmlFor="email" className="block text-xs font-medium uppercase tracking-wide text-neutral-600">
-            E-mail
-          </label>
+          <label className="campo-rotulo" htmlFor="email">E-mail</label>
           <input
             id="email"
             type="email"
             required
             autoComplete="username"
+            autoFocus
+            className="campo"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
           />
         </div>
 
         <div>
-          <label htmlFor="senha" className="block text-xs font-medium uppercase tracking-wide text-neutral-600">
-            Senha
-          </label>
+          <label className="campo-rotulo" htmlFor="senha">Senha</label>
           <input
             id="senha"
             type="password"
             required
             autoComplete="current-password"
+            className="campo"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-1 focus:ring-teal-600"
           />
         </div>
       </div>
 
       {erro && (
-        <p role="alert" className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" aria-live="polite" className="aviso-erro mt-4">
           {erro}
         </p>
       )}
 
-      <button
-        type="submit"
-        disabled={enviando}
-        className="w-full rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-800 disabled:opacity-50"
-      >
+      <button type="submit" disabled={enviando} className="btn btn-primario mt-6 w-full">
         {enviando ? 'Entrando…' : 'Entrar'}
       </button>
 
-      <p className="text-center text-xs text-neutral-400">
+      <p className="mt-6 border-t border-[var(--line)] pt-4 text-center text-xs text-[var(--ink-3)]">
         Acessos são registrados para fins de auditoria.
       </p>
     </form>
@@ -106,7 +103,7 @@ function FormularioLogin() {
 
 export default function PaginaLogin() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-50 px-4">
+    <main className="flex min-h-screen items-center justify-center px-5 py-10">
       <Suspense fallback={null}>
         <FormularioLogin />
       </Suspense>
