@@ -8,6 +8,7 @@ import {
 import { listarPessoas, resumoFolha, empresasVisiveis } from '@/lib/queries/colaboradores';
 import { modoArmazenamento } from '@/lib/store/blob';
 import BotaoSair from './botao-sair';
+import Conta from './conta';
 import Tabela from './tabela';
 
 // Dado sensível nunca deve ser pré-renderizado nem cacheado.
@@ -20,8 +21,15 @@ const brl = new Intl.NumberFormat('pt-BR', {
   maximumFractionDigits: 0,
 });
 
-export default async function Painel() {
+export default async function Painel({
+  searchParams,
+}: {
+  searchParams: Promise<{ erro?: string }>;
+}) {
   const usuario = await exigirSessao();
+  // `exigirPapel` devolve para cá com ?erro=sem-permissao; sem ler o parâmetro,
+  // a pessoa era jogada de volta sem entender por quê.
+  const { erro } = await searchParams;
   const [pessoas, resumo, empresas] = await Promise.all([
     listarPessoas(usuario),
     resumoFolha(usuario),
@@ -54,12 +62,19 @@ export default async function Painel() {
                 Usuários
               </Link>
             )}
+            <Conta precisaTrocar={usuario.trocarSenha} />
             <BotaoSair />
           </div>
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-6xl px-5 py-7 sm:px-6">
+        {erro === 'sem-permissao' && (
+          <p role="alert" className="aviso-erro mb-5">
+            Você não tem permissão para acessar aquela página.
+          </p>
+        )}
+
         <section className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="stat">
             <span className="stat-valor">{resumo.pessoas}</span>

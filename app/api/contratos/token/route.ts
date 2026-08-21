@@ -24,9 +24,9 @@ export async function POST(request: Request): Promise<NextResponse> {
         if (!usuario) throw new Error('Não autenticado.');
         if (!podeVerContrato(usuario)) throw new Error('Sem permissão.');
 
-        // O caminho é decidido pelo servidor e conferido aqui: sem isso, o
+        // O caminho é conferido por formato, não só por prefixo: sem isso o
         // cliente poderia escrever em qualquer lugar do armazenamento.
-        if (!pathname.startsWith('contratos/')) {
+        if (!/^contratos\/[0-9a-fA-F-]{36}\/[0-9a-fA-F-]{36}\.pdf$/.test(pathname)) {
           throw new Error('Caminho não permitido.');
         }
 

@@ -92,7 +92,24 @@ export async function salvarColaborador(
       c.dataContratacao = dados.dataContratacao;
 
       const antigos = new Map(c.vinculos.map((v) => [v.empresaId, v]));
-      c.vinculos = dados.vinculos.map((v) => {
+
+      /*
+       * O formulário NÃO recebe a lista completa de vínculos: `listarPessoas`
+       * entrega só os que o usuário pode ver e só os ativos. Tratar o que ele
+       * enviou como a lista inteira apagava silenciosamente:
+       *   - vínculos de empresas fora do escopo do gestor (salário de outra
+       *     empresa some quando ele edita alguém que atua em várias);
+       *   - vínculos inativos, que existem justamente para preservar histórico.
+       * Por isso o que ele não podia enxergar é preservado intacto.
+       */
+      const enviadas = new Set(dados.vinculos.map((v) => v.empresaId));
+      const preservados = c.vinculos.filter(
+        (v) =>
+          !enviadas.has(v.empresaId) &&
+          (!v.ativo || !podeVerEmpresa(usuario, v.empresaId)),
+      );
+
+      const editados = dados.vinculos.map((v) => {
         const antigo = antigos.get(v.empresaId);
         const centavos = reaisParaCentavos(v.valor);
         if (antigo && antigo.valorFixoCentavos !== centavos) {
@@ -110,6 +127,8 @@ export async function salvarColaborador(
           ativo: true,
         };
       });
+
+      c.vinculos = [...preservados, ...editados];
       c.atualizadoEm = agora;
     } else {
       const novo: Colaborador = {
@@ -180,9 +199,22 @@ export async function desligarColaborador(id: string): Promise<Resultado> {
       erro = 'Colaborador não encontrado.';
       return;
     }
+    /*
+     * Desligar remove a pessoa do painel de TODAS as empresas e apaga o
+     * contrato. Um gestor que enxerga só uma das empresas não pode tomar essa
+     * decisão pelas outras — por isso exige-se escopo sobre todos os vínculos,
+     * não apenas sobre um deles.
+     */
     if (usuario.empresasPermitidas !== null) {
-      const alcanca = c.vinculos.some((v) => podeVerEmpresa(usuario, v.empresaId));
-      if (!alcanca) {
+      const forasDoEscopo = c.vinculos.filter(
+        (v) => v.ativo && !podeVerEmpresa(usuario, v.empresaId),
+      );
+      if (forasDoEscopo.length > 0) {
+        erro =
+          'Esta pessoa também atua em outra empresa. Só um administrador pode desligá-la.';
+        return;
+      }
+      if (!c.vinculos.some((v) => podeVerEmpresa(usuario, v.empresaId))) {
         erro = 'Sem acesso a este colaborador.';
         return;
       }

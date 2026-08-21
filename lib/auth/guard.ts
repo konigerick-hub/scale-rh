@@ -21,6 +21,8 @@ export type UsuarioAutenticado = {
   papel: Papel;
   /** null = acesso irrestrito (admin). Lista = só estas empresas. */
   empresasPermitidas: string[] | null;
+  /** true = senha ainda é a que o administrador definiu, precisa ser trocada. */
+  trocarSenha: boolean;
 };
 
 export async function sessaoAtual(): Promise<UsuarioAutenticado | null> {
@@ -39,6 +41,7 @@ export async function sessaoAtual(): Promise<UsuarioAutenticado | null> {
     nome: usuario.nome,
     papel: usuario.papel,
     empresasPermitidas: usuario.papel === 'admin' ? null : usuario.empresaIds,
+    trocarSenha: usuario.trocarSenha === true,
   };
 }
 

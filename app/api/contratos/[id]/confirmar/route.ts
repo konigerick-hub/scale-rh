@@ -11,8 +11,24 @@ import {
 
 export const runtime = 'nodejs';
 
+/*
+ * O caminho é validado por formato, não só por prefixo.
+ *
+ * `startsWith('contratos/<id>/')` sozinho aceita `contratos/<id>/../../dados/base.json`,
+ * que no modo de disco local o `path.join` normaliza para o arquivo do cadastro
+ * — e o tratamento de erro desta rota apaga o caminho recusado, o que
+ * destruiria a base inteira. A expressão abaixo só admite os caracteres que
+ * `caminhoContrato()` gera, então `..` nunca passa.
+ */
 const schema = z.object({
-  caminho: z.string().min(1).max(500),
+  caminho: z
+    .string()
+    .min(1)
+    .max(500)
+    .regex(
+      /^contratos\/[0-9a-fA-F-]{36}\/[0-9a-fA-F-]{36}\.pdf$/,
+      'Caminho inválido.',
+    ),
   nomeArquivo: z.string().min(1).max(200),
 });
 
