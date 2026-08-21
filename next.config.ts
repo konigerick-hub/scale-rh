@@ -36,8 +36,16 @@ const cabecalhosSeguranca = [
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self'",
-      // Sem CDN: nenhuma origem externa é permitida para dados.
-      "connect-src 'self'",
+      /*
+       * O envio de contrato vai do navegador DIRETO para o armazenamento —
+       * a função da Vercel recusa corpo acima de ~4,5 MB. Esses dois hosts são
+       * o mínimo para isso funcionar: `vercel.com` emite a URL de destino e
+       * `*.vercel-storage.com` recebe o arquivo.
+       *
+       * Sem eles, o token é emitido normalmente e o navegador é bloqueado na
+       * hora de enviar — o upload falha sem erro claro na tela.
+       */
+      "connect-src 'self' https://vercel.com https://*.vercel-storage.com",
       // PDF de contrato é servido pela própria aplicação, via URL assinada.
       "object-src 'none'",
       "base-uri 'none'",
