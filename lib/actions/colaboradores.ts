@@ -70,6 +70,7 @@ export async function salvarColaborador(
   const agora = new Date().toISOString();
   let erro: string | null = null;
   const alteracoesDeValor: { cargo: string; de: number; para: number }[] = [];
+  const removidos: { empresaId: string; cargo: string; valor: number }[] = [];
 
   await alterarBase((base) => {
     if (id) {
@@ -128,6 +129,21 @@ export async function salvarColaborador(
         };
       });
 
+      // Remoção precisa ser registrada tanto quanto alteração de valor: sem
+      // isto, apagar o vínculo de alguém não deixa rastro nenhum na auditoria,
+      // e some da folha sem que se saiba quem tirou nem quanto era.
+      for (const antigo of c.vinculos) {
+        const some =
+          !preservados.includes(antigo) && !enviadas.has(antigo.empresaId);
+        if (some) {
+          removidos.push({
+            empresaId: antigo.empresaId,
+            cargo: antigo.cargo,
+            valor: antigo.valorFixoCentavos / 100,
+          });
+        }
+      }
+
       c.vinculos = [...preservados, ...editados];
       c.atualizadoEm = agora;
     } else {
@@ -174,6 +190,17 @@ export async function salvarColaborador(
       entidade: 'colaborador',
       entidadeId: id ?? undefined,
       metadata: { nome: dados.nome, cargo: a.cargo, de: a.de / 100, para: a.para / 100 },
+    });
+  }
+
+  for (const r of removidos) {
+    await auditar({
+      acao: Acao.VINCULO_REMOVER,
+      usuarioId: usuario.id,
+      usuarioEmail: usuario.email,
+      entidade: 'colaborador',
+      entidadeId: id ?? undefined,
+      metadata: { nome: dados.nome, cargo: r.cargo, valorRemovido: r.valor },
     });
   }
 

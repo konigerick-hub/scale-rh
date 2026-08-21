@@ -28,6 +28,9 @@ export const Acao = {
   /** Salário é o campo mais sensível: toda alteração fica registrada. */
   VINCULO_ALTERAR_VALOR: 'vinculo.alterar_valor',
 
+  /** Remover um vinculo tira dinheiro da folha e precisa deixar rastro. */
+  VINCULO_REMOVER: 'vinculo.remover',
+
   /** Ver contrato assinado é evento auditável por si só. */
   CONTRATO_VISUALIZAR: 'contrato.visualizar',
   CONTRATO_ENVIAR: 'contrato.enviar',
