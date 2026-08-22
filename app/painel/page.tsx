@@ -1,9 +1,11 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
 import {
   exigirSessao,
   podeVerContrato,
   podeEditar,
   podeGerenciarUsuarios,
+  podeVerColaboradores,
 } from '@/lib/auth/guard';
 import { listarPessoas, resumoFolha, empresasVisiveis } from '@/lib/queries/colaboradores';
 import { modoArmazenamento } from '@/lib/store/blob';
@@ -28,6 +30,8 @@ export default async function Painel({
   searchParams: Promise<{ erro?: string }>;
 }) {
   const usuario = await exigirSessao();
+  // Papel comercial nao tem acesso a colaboradores: vai direto para a area dele.
+  if (!podeVerColaboradores(usuario)) redirect('/painel/comercial');
   // `exigirPapel` devolve para cá com ?erro=sem-permissao; sem ler o parâmetro,
   // a pessoa era jogada de volta sem entender por quê.
   const { erro } = await searchParams;
@@ -59,6 +63,9 @@ export default async function Painel({
               <span className="mx-1.5 opacity-40">·</span>
               <span className="text-[var(--accent)]">{usuario.papel}</span>
             </span>
+            <Link href="/painel/comercial" className="btn btn-secundario btn-mini">
+              Comercial
+            </Link>
             <Link href="/painel/dashboard" className="btn btn-secundario btn-mini">
               Indicadores
             </Link>

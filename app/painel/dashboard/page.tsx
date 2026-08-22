@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { exigirSessao } from '@/lib/auth/guard';
+import { redirect } from 'next/navigation';
+import { exigirSessao, podeVerColaboradores } from '@/lib/auth/guard';
 import { indicadores } from '@/lib/queries/dashboard';
 
 export const dynamic = 'force-dynamic';
@@ -14,6 +15,8 @@ const CLIMA: Record<string, { label: string; cor: string }> = {
 
 export default async function Dashboard() {
   const usuario = await exigirSessao();
+  // Indicadores sao de colaboradores: fora do alcance do papel comercial.
+  if (!podeVerColaboradores(usuario)) redirect('/painel/comercial');
   const d = await indicadores(usuario);
 
   const maxTempo = Math.max(...d.tempoDeCasa.map((f) => f.total), 1);

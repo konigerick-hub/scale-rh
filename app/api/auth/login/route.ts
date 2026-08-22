@@ -83,7 +83,9 @@ export async function POST(req: NextRequest) {
     usuarioEmail: usuario.email,
   });
 
-  const res = NextResponse.json({ ok: true, trocarSenha: usuario.trocarSenha });
+  // O vendedor nao tem acesso a /painel; mandar para la daria um redirect a mais.
+  const destino = usuario.papel === 'admin' || usuario.papel === 'gestor' ? '/painel' : '/painel/comercial';
+  const res = NextResponse.json({ ok: true, trocarSenha: usuario.trocarSenha, destino });
   res.cookies.set(COOKIE_SESSAO, token, opcoesCookie);
   return res;
 }

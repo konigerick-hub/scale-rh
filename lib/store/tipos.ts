@@ -7,7 +7,16 @@
  * de verdade.
  */
 
-export type Papel = 'admin' | 'gestor' | 'leitura';
+/**
+ * Papéis, do mais amplo ao mais restrito:
+ *  - `admin`     — tudo: contas, modelos, dados pessoais, colaboradores
+ *  - `gestor`    — colaboradores das empresas vinculadas + contratos comerciais
+ *  - `comercial` — SÓ contratos comerciais; não enxerga a área de colaboradores
+ *
+ * `leitura` existiu antes e virou `comercial`. `guard.ts` converte registros
+ * antigos na leitura, então nenhuma conta fica com papel inválido.
+ */
+export type Papel = 'admin' | 'gestor' | 'comercial';
 
 export type Clima = 'excelente' | 'saudavel' | 'atencao' | 'critico';
 
@@ -208,7 +217,88 @@ export type BaseDados = {
   modelos?: ModeloContrato[];
   /** Campos extras que você define, para usar como marcador nos modelos. */
   camposPersonalizados?: CampoPersonalizado[];
+  /** Modelos de contrato de cliente, um conjunto por empresa. */
+  modelosComerciais?: ModeloComercial[];
+  /** Histórico dos contratos de cliente já gerados. */
+  contratosComerciais?: ContratoComercial[];
 };
+
+/* ------------------------------------------------------------------ *
+ * Contratos comerciais — venda para cliente
+ * ------------------------------------------------------------------ */
+
+/** Cada modelo pertence a UMA empresa: quem vende pela Acelera usa o dela. */
+export type ModeloComercial = {
+  id: string;
+  empresaId: string;
+  nome: string;
+  conteudo: string;
+  criadoEm: string;
+  atualizadoEm: string;
+};
+
+/** Dados do cliente preenchidos pelo vendedor no formulário. */
+export type DadosCliente = {
+  razaoSocial: string;
+  /** CNPJ ou CPF — cliente pode ser pessoa física. */
+  documento: string;
+  endereco: string;
+  representante: string;
+  representanteCpf: string;
+  email: string;
+  telefone: string;
+  objeto: string;
+  valorCentavos: number;
+  formaPagamento: string;
+  vigencia: string;
+  /** Valores dos campos personalizados comerciais. */
+  extras?: Record<string, string>;
+};
+
+/**
+ * Registro do que foi gerado.
+ *
+ * O PDF não é guardado — é remontado a partir destes dados quando preciso.
+ * Assim o histórico fica leve e continua sendo possível reemitir a via.
+ */
+export type ContratoComercial = {
+  id: string;
+  empresaId: string;
+  modeloId: string;
+  /** Nome do modelo no momento da emissão: o modelo pode mudar depois. */
+  modeloNome: string;
+  cliente: DadosCliente;
+  geradoPor: string;
+  geradoPorNome: string;
+  geradoEm: string;
+};
+
+/** Marcadores do contrato comercial. */
+export const MARCADORES_COMERCIAIS: { chave: string; descricao: string; grupo: string }[] = [
+  { chave: 'clienteRazaoSocial', descricao: 'Razão social ou nome', grupo: 'Cliente' },
+  { chave: 'clienteDocumento', descricao: 'CNPJ ou CPF', grupo: 'Cliente' },
+  { chave: 'clienteEndereco', descricao: 'Endereço', grupo: 'Cliente' },
+  { chave: 'clienteRepresentante', descricao: 'Quem assina pelo cliente', grupo: 'Cliente' },
+  { chave: 'clienteRepresentanteCpf', descricao: 'CPF de quem assina', grupo: 'Cliente' },
+  { chave: 'clienteEmail', descricao: 'E-mail', grupo: 'Cliente' },
+  { chave: 'clienteTelefone', descricao: 'Telefone', grupo: 'Cliente' },
+
+  { chave: 'objeto', descricao: 'O que foi contratado', grupo: 'Negócio' },
+  { chave: 'valor', descricao: 'Valor, ex: R$ 5.000,00', grupo: 'Negócio' },
+  { chave: 'valorExtenso', descricao: 'Valor por extenso', grupo: 'Negócio' },
+  { chave: 'formaPagamento', descricao: 'Como será pago', grupo: 'Negócio' },
+  { chave: 'vigencia', descricao: 'Prazo ou vigência', grupo: 'Negócio' },
+
+  { chave: 'empresa', descricao: 'Nome curto da empresa', grupo: 'Contratada' },
+  { chave: 'empresaRazaoSocial', descricao: 'Razão social', grupo: 'Contratada' },
+  { chave: 'empresaCnpj', descricao: 'CNPJ', grupo: 'Contratada' },
+  { chave: 'empresaEndereco', descricao: 'Endereço', grupo: 'Contratada' },
+  { chave: 'empresaRepresentante', descricao: 'Quem assina pela empresa', grupo: 'Contratada' },
+  { chave: 'empresaRepresentanteCpf', descricao: 'CPF de quem assina', grupo: 'Contratada' },
+
+  { chave: 'vendedor', descricao: 'Quem gerou o contrato', grupo: 'Emissão' },
+  { chave: 'hoje', descricao: 'Data de hoje por extenso', grupo: 'Emissão' },
+];
 
 export const BASE_VAZIA: BaseDados = {
   versao: 1,

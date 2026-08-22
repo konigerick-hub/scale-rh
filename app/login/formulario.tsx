@@ -31,7 +31,9 @@ export default function FormularioLogin() {
       // Só aceita destino interno — `proximo` vem da URL e não é confiável.
       const proximo = params.get('proximo');
       const destino =
-        proximo?.startsWith('/') && !proximo.startsWith('//') ? proximo : '/painel';
+        proximo?.startsWith('/') && !proximo.startsWith('//')
+          ? proximo
+          : (dados.destino ?? '/painel');
       router.push(destino);
       router.refresh();
     } catch {

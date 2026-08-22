@@ -1,6 +1,6 @@
 import 'server-only';
 import PDFDocument from 'pdfkit';
-import type { Colaborador, Empresa, Vinculo } from '@/lib/store/tipos';
+import type { Colaborador, DadosCliente, Empresa, Vinculo } from '@/lib/store/tipos';
 
 /**
  * Geração do contrato em PDF a partir de um modelo de texto.
@@ -145,6 +145,48 @@ export function preencherModelo(
 export function marcadoresDesconhecidos(conteudo: string, validos: string[]): string[] {
   const achados = [...conteudo.matchAll(/\{\{\s*([a-zA-Z]+)\s*\}\}/g)].map((m) => m[1]);
   return [...new Set(achados.filter((c) => !validos.includes(c)))];
+}
+
+/** Preenche o modelo comercial com os dados do cliente e da empresa. */
+export function preencherModeloComercial(
+  conteudo: string,
+  cliente: DadosCliente,
+  empresa: Empresa,
+  vendedor: string,
+): string {
+  const valores: Record<string, string> = {
+    clienteRazaoSocial: ouLacuna(cliente.razaoSocial, 30),
+    clienteDocumento: ouLacuna(cliente.documento, 18),
+    clienteEndereco: ouLacuna(cliente.endereco, 40),
+    clienteRepresentante: ouLacuna(cliente.representante, 30),
+    clienteRepresentanteCpf: ouLacuna(cliente.representanteCpf, 14),
+    clienteEmail: ouLacuna(cliente.email, 24),
+    clienteTelefone: ouLacuna(cliente.telefone, 16),
+
+    objeto: ouLacuna(cliente.objeto, 40),
+    valor: brl.format(cliente.valorCentavos / 100),
+    valorExtenso: reaisPorExtenso(cliente.valorCentavos),
+    formaPagamento: ouLacuna(cliente.formaPagamento, 30),
+    vigencia: ouLacuna(cliente.vigencia, 20),
+
+    empresa: empresa.nome,
+    empresaRazaoSocial: ouLacuna(empresa.razaoSocial ?? empresa.nome, 30),
+    empresaCnpj: ouLacuna(empresa.cnpj, 18),
+    empresaEndereco: ouLacuna(empresa.endereco, 40),
+    empresaRepresentante: ouLacuna(empresa.representante, 30),
+    empresaRepresentanteCpf: ouLacuna(empresa.representanteCpf, 14),
+
+    vendedor: ouLacuna(vendedor, 25),
+    hoje: porExtenso(new Date()),
+  };
+
+  for (const [chave, valor] of Object.entries(cliente.extras ?? {})) {
+    if (!(chave in valores)) valores[chave] = ouLacuna(valor, 20);
+  }
+
+  return conteudo.replace(/\{\{\s*([a-zA-Z]+)\s*\}\}/g, (bruto, chave) =>
+    chave in valores ? valores[chave] : bruto,
+  );
 }
 
 export function gerarPdf(titulo: string, corpo: string): Promise<Buffer> {

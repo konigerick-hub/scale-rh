@@ -8,7 +8,7 @@ type Usuario = {
   id: string;
   email: string;
   nome: string;
-  papel: 'admin' | 'gestor' | 'leitura';
+  papel: 'admin' | 'gestor' | 'comercial';
   ativo: boolean;
   empresaIds: string[];
   ultimoLoginEm: string | null;
@@ -18,9 +18,9 @@ const campo = 'campo';
 const rotulo = 'campo-rotulo';
 
 const PAPEL_DESC: Record<string, string> = {
-  admin: 'vê tudo, gerencia contas e contratos',
-  gestor: 'edita, mas só as empresas marcadas',
-  leitura: 'só consulta, só as empresas marcadas',
+  admin: 'vê tudo: contas, modelos, colaboradores e comercial',
+  gestor: 'colaboradores das empresas marcadas + contratos comerciais',
+  comercial: 'SÓ gera contrato de cliente — não vê a área de colaboradores',
 };
 
 export default function GerenciarUsuarios({
@@ -35,7 +35,7 @@ export default function GerenciarUsuarios({
   const [aberto, setAberto] = useState(false);
   const [email, setEmail] = useState('');
   const [nome, setNome] = useState('');
-  const [papel, setPapel] = useState<'admin' | 'gestor' | 'leitura'>('leitura');
+  const [papel, setPapel] = useState<'admin' | 'gestor' | 'comercial'>('comercial');
   const [empresaIds, setEmpresaIds] = useState<string[]>([]);
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState<string | null>(null);
@@ -48,7 +48,7 @@ export default function GerenciarUsuarios({
       const r = await criarUsuario({ email, nome, papel, empresaIds, senha });
       if (r.ok) {
         setAberto(false);
-        setEmail(''); setNome(''); setPapel('leitura'); setEmpresaIds([]); setSenha('');
+        setEmail(''); setNome(''); setPapel('comercial'); setEmpresaIds([]); setSenha('');
       } else setErro(r.erro);
     });
   }
@@ -91,7 +91,7 @@ export default function GerenciarUsuarios({
               <label className={rotulo} htmlFor="u-papel">Papel</label>
               <select id="u-papel" className={campo} value={papel}
                 onChange={(e) => setPapel(e.target.value as typeof papel)}>
-                <option value="leitura">Leitura</option>
+                <option value="comercial">Comercial</option>
                 <option value="gestor">Gestor</option>
                 <option value="admin">Administrador</option>
               </select>
@@ -110,7 +110,7 @@ export default function GerenciarUsuarios({
 
           {papel !== 'admin' && (
             <div className="mt-4">
-              <span className={rotulo}>Empresas que esta pessoa poderá ver</span>
+              <span className={rotulo}>{papel === 'comercial' ? 'Empresas pelas quais pode emitir contrato' : 'Empresas que esta pessoa poderá ver'}</span>
               <div className="flex flex-wrap gap-3">
                 {empresas.map((e) => (
                   <label key={e.id} className="flex items-center gap-2 text-sm text-[var(--ink-2)]">

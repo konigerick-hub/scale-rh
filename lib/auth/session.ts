@@ -19,7 +19,7 @@ export const COOKIE_SESSAO =
 /** 4 horas. Curto porque o dado é sensível; o usuário refaz login no dia seguinte. */
 const DURACAO_SEGUNDOS = 4 * 60 * 60;
 
-export type Papel = 'admin' | 'gestor' | 'leitura';
+export type Papel = 'admin' | 'gestor' | 'comercial';
 
 export type Sessao = {
   usuarioId: string;

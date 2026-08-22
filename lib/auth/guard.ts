@@ -35,12 +35,18 @@ export async function sessaoAtual(): Promise<UsuarioAutenticado | null> {
   const usuario = base.usuarios.find((u) => u.id === sessao.usuarioId);
   if (!usuario || !usuario.ativo) return null;
 
+  // Contas criadas antes de `comercial` existir tinham papel `leitura`.
+  // Sem esta conversão elas cairiam num papel desconhecido e, dependendo da
+  // comparação, poderiam escapar de alguma checagem.
+  const papel: Papel =
+    usuario.papel === 'admin' || usuario.papel === 'gestor' ? usuario.papel : 'comercial';
+
   return {
     id: usuario.id,
     email: usuario.email,
     nome: usuario.nome,
-    papel: usuario.papel,
-    empresasPermitidas: usuario.papel === 'admin' ? null : usuario.empresaIds,
+    papel,
+    empresasPermitidas: papel === 'admin' ? null : usuario.empresaIds,
     trocarSenha: usuario.trocarSenha === true,
   };
 }
@@ -62,8 +68,39 @@ export async function exigirPapel(...papeis: Papel[]): Promise<UsuarioAutenticad
  * Regras de permissão — declaradas em um lugar só
  * ------------------------------------------------------------------ */
 
+/**
+ * A área de colaboradores exige gestor ou admin.
+ *
+ * `comercial` é o papel do vendedor: ele entra no sistema apenas para gerar
+ * contrato de cliente, e salário e contrato de colaborador não são assunto
+ * dele. Esta é a checagem que separa as duas áreas.
+ */
+export function podeVerColaboradores(u: UsuarioAutenticado): boolean {
+  return u.papel === 'admin' || u.papel === 'gestor';
+}
+
 export function podeEditar(u: UsuarioAutenticado): boolean {
   return u.papel === 'admin' || u.papel === 'gestor';
+}
+
+/** Todos os papéis geram contrato comercial — é o mínimo que a conta permite. */
+export function podeGerarComercial(): boolean {
+  return true;
+}
+
+/** Só admin escreve os modelos comerciais e os dados das empresas. */
+export function podeEditarModelosComerciais(u: UsuarioAutenticado): boolean {
+  return u.papel === 'admin';
+}
+
+/** Vendedor vê o histórico do que ele mesmo gerou; admin vê de todos. */
+export function podeVerTodosComerciais(u: UsuarioAutenticado): boolean {
+  return u.papel === 'admin';
+}
+
+/** Para onde mandar a pessoa ao entrar, conforme o que ela pode acessar. */
+export function paginaInicial(u: UsuarioAutenticado): string {
+  return podeVerColaboradores(u) ? '/painel' : '/painel/comercial';
 }
 
 /**

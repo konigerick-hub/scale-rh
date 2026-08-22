@@ -13,7 +13,7 @@ export type Resultado = { ok: true } | { ok: false; erro: string };
 const novoUsuarioSchema = z.object({
   email: z.string().email('E-mail inválido.').max(255),
   nome: z.string().trim().min(2, 'Informe o nome.').max(120),
-  papel: z.enum(['admin', 'gestor', 'leitura']),
+  papel: z.enum(['admin', 'gestor', 'comercial']),
   empresaIds: z.array(z.string().uuid()),
   senha: z.string().min(1, 'Informe a senha inicial.'),
 });
