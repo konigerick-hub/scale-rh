@@ -219,8 +219,6 @@ export type BaseDados = {
   camposPersonalizados?: CampoPersonalizado[];
   /** Modelos de contrato de cliente, um conjunto por empresa. */
   modelosComerciais?: ModeloComercial[];
-  /** Histórico dos contratos de cliente já gerados. */
-  contratosComerciais?: ContratoComercial[];
 };
 
 /* ------------------------------------------------------------------ *
@@ -255,23 +253,14 @@ export type DadosCliente = {
   extras?: Record<string, string>;
 };
 
-/**
- * Registro do que foi gerado.
+/*
+ * Contrato comercial NAO e guardado.
  *
- * O PDF não é guardado — é remontado a partir destes dados quando preciso.
- * Assim o histórico fica leve e continua sendo possível reemitir a via.
+ * Sao ~120 por mes, e o documento de dados e lido e reescrito inteiro a cada
+ * gravacao: guardar o historico levaria base.json a mais de 1 MB em um ano,
+ * deixando lento ate o login. O rastro fica na auditoria, que grava um arquivo
+ * pequeno por evento, sem passar pelo documento principal.
  */
-export type ContratoComercial = {
-  id: string;
-  empresaId: string;
-  modeloId: string;
-  /** Nome do modelo no momento da emissão: o modelo pode mudar depois. */
-  modeloNome: string;
-  cliente: DadosCliente;
-  geradoPor: string;
-  geradoPorNome: string;
-  geradoEm: string;
-};
 
 /** Marcadores do contrato comercial. */
 export const MARCADORES_COMERCIAIS: { chave: string; descricao: string; grupo: string }[] = [

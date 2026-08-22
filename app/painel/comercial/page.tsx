@@ -5,7 +5,6 @@ import {
   podeEditarModelosComerciais,
 } from '@/lib/auth/guard';
 import { carregarBase } from '@/lib/store/dados';
-import { listarContratosComerciais } from '@/lib/actions/comercial';
 import { MARCADORES_COMERCIAIS } from '@/lib/store/tipos';
 import BotaoSair from '../botao-sair';
 import Conta from '../conta';
@@ -17,7 +16,6 @@ export const revalidate = 0;
 export default async function PaginaComercial() {
   const usuario = await exigirSessao();
   const { base } = await carregarBase();
-  const historico = await listarContratosComerciais();
 
   // Vendedor só emite pela empresa a que está vinculado; admin, por todas.
   const empresasPermitidas =
@@ -77,10 +75,8 @@ export default async function PaginaComercial() {
             temDados: Boolean(e.cnpj?.trim() && e.razaoSocial?.trim()),
           }))}
           modelos={modelos}
-          historico={historico}
           podeEditarModelos={podeEditarModelosComerciais(usuario)}
           marcadores={MARCADORES_COMERCIAIS}
-          verTodos={usuario.papel === 'admin'}
         />
       </main>
     </>

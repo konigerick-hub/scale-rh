@@ -1,23 +1,11 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { gerarContratoComercial } from '@/lib/actions/comercial';
 import ModelosComerciais, { type ModeloComercialEdicao } from './modelos';
 
 type Empresa = { id: string; nome: string; temDados: boolean };
 type Marcador = { chave: string; descricao: string; grupo: string };
-type Historico = {
-  id: string;
-  cliente: string;
-  valor: number;
-  modeloNome: string;
-  empresaNome: string;
-  geradoPorNome: string;
-  geradoEm: string;
-};
-
-const brl = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
 
 const CLIENTE_VAZIO = {
   razaoSocial: '', documento: '', endereco: '', representante: '',
@@ -28,25 +16,21 @@ const CLIENTE_VAZIO = {
 export default function AreaComercial({
   empresas,
   modelos,
-  historico,
   podeEditarModelos,
   marcadores,
-  verTodos,
 }: {
   empresas: Empresa[];
   modelos: ModeloComercialEdicao[];
-  historico: Historico[];
   podeEditarModelos: boolean;
   marcadores: Marcador[];
-  verTodos: boolean;
 }) {
-  const [aba, setAba] = useState<'gerar' | 'historico' | 'modelos'>('gerar');
+  const [aba, setAba] = useState<'gerar' | 'modelos'>('gerar');
   const [empresaId, setEmpresaId] = useState(empresas[0]?.id ?? '');
   const [modeloId, setModeloId] = useState('');
   const [cliente, setCliente] = useState(CLIENTE_VAZIO);
   const [erro, setErro] = useState<string | null>(null);
-  const [gerado, setGerado] = useState<{ id: string; cliente: string } | null>(null);
-  const [pendente, iniciar] = useTransition();
+  const [gerado, setGerado] = useState<string | null>(null);
+  const [pendente, setPendente] = useState(false);
 
   const modelosDaEmpresa = useMemo(
     () => modelos.filter((m) => m.empresaId === empresaId),
@@ -57,30 +41,67 @@ export default function AreaComercial({
   const mudar = (campos: Partial<typeof CLIENTE_VAZIO>) =>
     setCliente((c) => ({ ...c, ...campos }));
 
-  function enviar(e: React.FormEvent) {
+  /**
+   * O PDF vem direto na resposta e é salvo pelo navegador.
+   *
+   * Nada é gravado no sistema — a única forma de reaver o arquivo é gerar de
+   * novo pelo formulário. Foi decisão para não inchar o cadastro com ~120
+   * contratos por mês.
+   */
+  async function enviar(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
     setGerado(null);
+
     const escolhido = modeloId || modelosDaEmpresa[0]?.id;
     if (!escolhido) {
       setErro('Escolha um modelo de contrato.');
       return;
     }
-    iniciar(async () => {
-      const r = await gerarContratoComercial(escolhido, {
-        ...cliente,
-        valor: Number(cliente.valor || 0),
+
+    setPendente(true);
+    try {
+      const res = await fetch('/api/comercial/gerar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modeloId: escolhido,
+          ...cliente,
+          valor: Number(cliente.valor || 0),
+        }),
       });
-      if (r.ok) {
-        setGerado({ id: r.id, cliente: cliente.razaoSocial });
-        setCliente(CLIENTE_VAZIO);
-      } else setErro(r.erro);
-    });
+
+      if (!res.ok) {
+        const dados = await res.json().catch(() => ({}));
+        setErro(dados.erro ?? 'Não foi possível gerar o contrato.');
+        return;
+      }
+
+      const arquivo = await res.blob();
+      const nome =
+        /filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ??
+        'contrato.pdf';
+
+      const url = URL.createObjectURL(arquivo);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = nome;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+
+      setGerado(cliente.razaoSocial);
+      setCliente(CLIENTE_VAZIO);
+    } catch {
+      setErro('Falha de conexão ao gerar o contrato.');
+    } finally {
+      setPendente(false);
+    }
   }
 
   const abas: [typeof aba, string][] = [
     ['gerar', 'Gerar contrato'],
-    ['historico', verTodos ? 'Emitidos' : 'Meus contratos'],
     ...(podeEditarModelos ? ([['modelos', 'Modelos']] as [typeof aba, string][]) : []),
   ];
 
@@ -102,13 +123,14 @@ export default function AreaComercial({
       {aba === 'gerar' && (
         <>
           {gerado && (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[var(--radius-sm)] border border-[var(--accent)] bg-[var(--accent-wash)] px-4 py-3">
-              <span className="text-sm text-[var(--ink)]">
-                Contrato de <strong>{gerado.cliente}</strong> gerado.
-              </span>
-              <a href={`/api/comercial/${gerado.id}`} download className="btn btn-primario btn-mini">
-                Baixar PDF
-              </a>
+            <div className="mb-5 rounded-[var(--radius-sm)] border border-[var(--accent)] bg-[var(--accent-wash)] px-4 py-3">
+              <p className="text-sm text-[var(--ink)]">
+                Contrato de <strong>{gerado}</strong> baixado.
+              </p>
+              <p className="mt-0.5 text-xs text-[var(--ink-2)]">
+                O arquivo não fica guardado no sistema. Se precisar de outra via,
+                preencha o formulário de novo.
+              </p>
             </div>
           )}
 
@@ -264,60 +286,6 @@ export default function AreaComercial({
             </form>
           )}
         </>
-      )}
-
-      {aba === 'historico' && (
-        historico.length === 0 ? (
-          <div className="cartao px-6 py-12 text-center">
-            <p className="font-medium text-[var(--ink)]">Nenhum contrato emitido ainda</p>
-            <p className="mt-1.5 text-sm text-[var(--ink-3)]">
-              Os contratos que você gerar aparecem aqui e podem ser baixados de novo.
-            </p>
-          </div>
-        ) : (
-          <div className="tabela-envolucro">
-            <div className="tabela-rolagem">
-              <table className="dados">
-                <thead>
-                  <tr>
-                    <th>Cliente</th>
-                    <th>Empresa &amp; modelo</th>
-                    <th className="text-right">Valor</th>
-                    {verTodos && <th>Emitido por</th>}
-                    <th>Data</th>
-                    <th aria-label="Ações" />
-                  </tr>
-                </thead>
-                <tbody>
-                  {historico.map((h) => (
-                    <tr key={h.id}>
-                      <td data-rotulo="Cliente" className="font-medium text-[var(--ink)]">
-                        {h.cliente}
-                      </td>
-                      <td data-rotulo="Empresa">
-                        <span className="block text-[var(--ink-2)]">{h.empresaNome}</span>
-                        <span className="block text-xs text-[var(--ink-3)]">{h.modeloNome}</span>
-                      </td>
-                      <td data-rotulo="Valor" className="num md:text-right">
-                        {brl.format(h.valor)}
-                      </td>
-                      {verTodos && (
-                        <td data-rotulo="Emitido por" className="text-xs">{h.geradoPorNome}</td>
-                      )}
-                      <td data-rotulo="Data" className="text-xs text-[var(--ink-3)]">
-                        {new Date(h.geradoEm).toLocaleString('pt-BR')}
-                      </td>
-                      <td data-rotulo="Ação" className="text-right">
-                        <a href={`/api/comercial/${h.id}`} download
-                          className="btn btn-secundario btn-mini">baixar</a>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )
       )}
 
       {aba === 'modelos' && podeEditarModelos && (
