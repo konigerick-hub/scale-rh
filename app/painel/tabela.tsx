@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import type { PessoaAgrupada } from '@/lib/queries/colaboradores';
-import ColaboradorForm, { type EmpresaOpcao, type ColaboradorEdicao, DOCS_VAZIOS } from './colaborador-form';
+import ColaboradorForm, { type EmpresaOpcao, type ColaboradorEdicao, type CampoExtra, DOCS_VAZIOS } from './colaborador-form';
 import GerarContrato, { type ModeloOpcao } from './gerar-contrato';
 import AvaliacaoForm from './avaliacao-form';
 import Contrato from './contrato';
@@ -36,6 +36,7 @@ type Props = {
   podeVerContrato: boolean;
   envioDireto: boolean;
   modelos: ModeloOpcao[];
+  camposExtras: CampoExtra[];
 };
 
 export default function Tabela({
@@ -45,6 +46,7 @@ export default function Tabela({
   podeVerContrato,
   envioDireto,
   modelos,
+  camposExtras,
 }: Props) {
   const [busca, setBusca] = useState('');
   const [filtroEmpresa, setFiltroEmpresa] = useState('');
@@ -298,6 +300,7 @@ export default function Tabela({
           empresas={empresas}
           inicial={editando}
           podeVerDocumentos={podeVerContrato}
+          camposExtras={camposExtras}
           aoFechar={() => { setCriando(false); setEditando(null); }}
         />
       )}

@@ -47,6 +47,7 @@ export const Acao = {
 
   /** CPF, RG e endereco sao dados pessoais: alteracao e acesso ficam registrados. */
   DOCUMENTOS_EDITAR: 'documentos.editar',
+  EMPRESA_EDITAR: 'empresa.editar',
   CONTRATO_GERAR: 'contrato.gerar',
   USUARIO_CRIAR: 'usuario.criar',
   USUARIO_DESATIVAR: 'usuario.desativar',

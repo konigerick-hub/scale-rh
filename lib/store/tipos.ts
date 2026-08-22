@@ -13,8 +13,20 @@ export type Clima = 'excelente' | 'saudavel' | 'atencao' | 'critico';
 
 export type Empresa = {
   id: string;
+  /** Nome curto, usado na tela. */
   nome: string;
   cor: string;
+
+  /*
+   * Dados da CONTRATANTE. Um contrato tem duas partes: sem CNPJ, razão social
+   * e quem assina pela empresa, o documento não se sustenta juridicamente.
+   * Opcionais porque as empresas foram criadas antes destes campos existirem.
+   */
+  razaoSocial?: string | null;
+  cnpj?: string | null;
+  endereco?: string | null;
+  representante?: string | null;
+  representanteCpf?: string | null;
 };
 
 export type Usuario = {
@@ -57,33 +69,89 @@ export type ModeloContrato = {
   atualizadoEm: string;
 };
 
-/** Marcadores aceitos no texto do modelo, e o que cada um vira. */
-export const MARCADORES: { chave: string; descricao: string }[] = [
-  { chave: 'nome', descricao: 'Nome do colaborador' },
-  { chave: 'cpf', descricao: 'CPF' },
-  { chave: 'rg', descricao: 'RG' },
-  { chave: 'nacionalidade', descricao: 'Nacionalidade' },
-  { chave: 'estadoCivil', descricao: 'Estado civil' },
-  { chave: 'endereco', descricao: 'Endereco completo' },
-  { chave: 'empresa', descricao: 'Empresa do vinculo' },
-  { chave: 'cargo', descricao: 'Cargo no vinculo' },
-  { chave: 'salario', descricao: 'Remuneracao formatada, ex: R$ 2.500,00' },
-  { chave: 'dataAdmissao', descricao: 'Data de admissao, ex: 01/03/2026' },
-  { chave: 'nascimento', descricao: 'Data de nascimento' },
-  { chave: 'hoje', descricao: 'Data de hoje por extenso' },
+/**
+ * Marcadores fixos aceitos no modelo, agrupados por origem do dado.
+ *
+ * O contrato é de PRESTAÇÃO DE SERVIÇOS entre duas pessoas jurídicas: uma das
+ * empresas do grupo (contratante) e o MEI do prestador (contratado). Por isso
+ * existem dois CNPJs, e não há PIS nem carteira de trabalho — nada aqui é
+ * vínculo celetista.
+ */
+export const MARCADORES: { chave: string; descricao: string; grupo: string }[] = [
+  // CONTRATADA — o MEI
+  { chave: 'meiRazaoSocial', descricao: 'Razão social do MEI', grupo: 'Contratada (MEI)' },
+  { chave: 'meiCnpj', descricao: 'CNPJ do MEI', grupo: 'Contratada (MEI)' },
+  { chave: 'meiEndereco', descricao: 'Endereço da sede do MEI', grupo: 'Contratada (MEI)' },
+
+  // A pessoa por trás do MEI
+  { chave: 'nome', descricao: 'Nome completo do titular', grupo: 'Titular do MEI' },
+  { chave: 'cpf', descricao: 'CPF do titular', grupo: 'Titular do MEI' },
+  { chave: 'rg', descricao: 'RG do titular', grupo: 'Titular do MEI' },
+  { chave: 'nacionalidade', descricao: 'Nacionalidade', grupo: 'Titular do MEI' },
+  { chave: 'estadoCivil', descricao: 'Estado civil', grupo: 'Titular do MEI' },
+  { chave: 'endereco', descricao: 'Endereço residencial', grupo: 'Titular do MEI' },
+  { chave: 'telefone', descricao: 'Telefone', grupo: 'Titular do MEI' },
+  { chave: 'email', descricao: 'E-mail', grupo: 'Titular do MEI' },
+  { chave: 'nascimento', descricao: 'Data de nascimento', grupo: 'Titular do MEI' },
+
+  // CONTRATANTE — a empresa do grupo
+  { chave: 'empresa', descricao: 'Nome curto da empresa', grupo: 'Contratante' },
+  { chave: 'empresaRazaoSocial', descricao: 'Razão social', grupo: 'Contratante' },
+  { chave: 'empresaCnpj', descricao: 'CNPJ', grupo: 'Contratante' },
+  { chave: 'empresaEndereco', descricao: 'Endereço da empresa', grupo: 'Contratante' },
+  { chave: 'empresaRepresentante', descricao: 'Quem assina pela empresa', grupo: 'Contratante' },
+  { chave: 'empresaRepresentanteCpf', descricao: 'CPF de quem assina', grupo: 'Contratante' },
+
+  // Objeto do contrato
+  { chave: 'servico', descricao: 'Serviço prestado (o "cargo" do cadastro)', grupo: 'Contrato' },
+  { chave: 'valorMensal', descricao: 'Valor mensal, ex: R$ 2.500,00', grupo: 'Contrato' },
+  { chave: 'valorExtenso', descricao: 'Valor mensal por extenso', grupo: 'Contrato' },
+  { chave: 'inicio', descricao: 'Início da prestação', grupo: 'Contrato' },
+  { chave: 'hoje', descricao: 'Data de hoje por extenso', grupo: 'Contrato' },
 ];
 
-/** Dados pessoais usados para preencher o contrato. Sensiveis: so admin ve. */
+/**
+ * Campo criado por você para o que não está na lista fixa.
+ *
+ * A definição é global (para o modelo poder validar o marcador), e o VALOR é
+ * preenchido por colaborador. Assim `{{banco}}` funciona em qualquer modelo e
+ * cada pessoa tem o seu banco.
+ */
+export type CampoPersonalizado = {
+  /** Vira o marcador: `{{chave}}`. Só letras, sem espaço. */
+  chave: string;
+  rotulo: string;
+};
+
+/**
+ * Dados do prestador para preencher o contrato. Sensíveis: só admin vê.
+ *
+ * Reúne os dados do MEI (a parte contratada) e do titular (a pessoa que assina
+ * por ele) — o contrato de prestação de serviços precisa dos dois.
+ */
 export type Documentos = {
+  // MEI (contratada)
+  meiRazaoSocial: string | null;
+  meiCnpj: string | null;
+  meiEndereco: string | null;
+
+  // Titular
   cpf: string | null;
   rg: string | null;
   nacionalidade: string | null;
   estadoCivil: string | null;
   endereco: string | null;
+  telefone: string | null;
+  email: string | null;
+
+  /** Valores dos campos personalizados, indexados pela chave. */
+  extras?: Record<string, string>;
 };
 
 export const DOCUMENTOS_VAZIOS: Documentos = {
-  cpf: null, rg: null, nacionalidade: null, estadoCivil: null, endereco: null,
+  meiRazaoSocial: null, meiCnpj: null, meiEndereco: null,
+  cpf: null, rg: null, nacionalidade: null, estadoCivil: null,
+  endereco: null, telefone: null, email: null, extras: {},
 };
 
 /** Arquivo de apoio enviado junto do cadastro (copia de RG, comprovante etc). */
@@ -138,6 +206,8 @@ export type BaseDados = {
   colaboradores: Colaborador[];
   /** Ausente em bases criadas antes desta funcionalidade. */
   modelos?: ModeloContrato[];
+  /** Campos extras que você define, para usar como marcador nos modelos. */
+  camposPersonalizados?: CampoPersonalizado[];
 };
 
 export const BASE_VAZIA: BaseDados = {

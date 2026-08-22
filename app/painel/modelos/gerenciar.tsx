@@ -4,20 +4,30 @@ import { useState, useTransition } from 'react';
 import { salvarModelo, removerModelo } from '@/lib/actions/modelos';
 
 type Modelo = { id: string; nome: string; conteudo: string; atualizadoEm: string };
-type Marcador = { chave: string; descricao: string };
+type Marcador = { chave: string; descricao: string; grupo: string };
 
 const EXEMPLO = `CONTRATO DE PRESTAÇÃO DE SERVIÇOS
 
-{{empresa}}, doravante denominada CONTRATANTE, e {{nome}}, {{nacionalidade}}, {{estadoCivil}}, portador(a) do RG nº {{rg}} e inscrito(a) no CPF sob o nº {{cpf}}, residente e domiciliado(a) em {{endereco}}, doravante denominado(a) CONTRATADO(A), celebram o presente contrato.
+CONTRATANTE: {{empresaRazaoSocial}}, pessoa jurídica de direito privado, inscrita no CNPJ sob o nº {{empresaCnpj}}, com sede em {{empresaEndereco}}, neste ato representada por {{empresaRepresentante}}, inscrito(a) no CPF sob o nº {{empresaRepresentanteCpf}}.
+
+CONTRATADA: {{meiRazaoSocial}}, microempreendedor individual inscrito no CNPJ sob o nº {{meiCnpj}}, com sede em {{meiEndereco}}, neste ato representada por seu titular {{nome}}, {{nacionalidade}}, {{estadoCivil}}, portador(a) do RG nº {{rg}} e inscrito(a) no CPF sob o nº {{cpf}}, residente e domiciliado(a) em {{endereco}}.
+
+As partes acima qualificadas celebram o presente Contrato de Prestação de Serviços, que se regerá pelas cláusulas seguintes.
 
 CLÁUSULA 1ª — DO OBJETO
-O CONTRATADO exercerá a função de {{cargo}}, com início em {{dataAdmissao}}.
+A CONTRATADA prestará à CONTRATANTE serviços de {{servico}}, com início em {{inicio}}.
 
-CLÁUSULA 2ª — DA REMUNERAÇÃO
-Pelos serviços prestados, o CONTRATADO receberá a quantia mensal de {{salario}}.
+CLÁUSULA 2ª — DA AUTONOMIA
+Os serviços serão prestados com autonomia técnica, sem subordinação, pessoalidade ou habitualidade, não se estabelecendo vínculo empregatício entre as partes, nos termos do art. 442-B da CLT. A CONTRATADA é responsável por seus próprios tributos e obrigações acessórias.
 
-CLÁUSULA 3ª — DA VIGÊNCIA
-O presente contrato vigora por prazo indeterminado, podendo ser rescindido por qualquer das partes mediante aviso prévio de 30 dias.
+CLÁUSULA 3ª — DO VALOR E DO PAGAMENTO
+Pelos serviços prestados, a CONTRATANTE pagará à CONTRATADA a quantia mensal de {{valorMensal}} ({{valorExtenso}}), mediante apresentação da respectiva nota fiscal.
+
+CLÁUSULA 4ª — DA VIGÊNCIA E DA RESCISÃO
+O presente contrato vigora por prazo indeterminado, podendo ser rescindido por qualquer das partes, imotivadamente, mediante comunicação prévia de 30 (trinta) dias.
+
+CLÁUSULA 5ª — DA CONFIDENCIALIDADE
+A CONTRATADA obriga-se a manter sigilo sobre todas as informações a que tiver acesso em razão deste contrato, durante sua vigência e após seu término.
 
 E por estarem assim justas e contratadas, as partes assinam o presente instrumento.
 
@@ -116,19 +126,28 @@ export default function GerenciarModelos({
           </div>
         </div>
 
-        <aside className="cartao h-fit p-4">
+        <aside className="cartao h-fit max-h-[80vh] overflow-y-auto p-4">
           <p className="campo-rotulo">Marcadores</p>
           <p className="mb-3 text-xs text-[var(--ink-3)]">
             Clique para inserir no fim do texto.
           </p>
-          <div className="flex flex-col gap-1">
-            {marcadores.map((m) => (
-              <button key={m.chave} type="button" onClick={() => inserir(m.chave)}
-                title={m.descricao}
-                className="flex flex-col items-start rounded-[var(--radius-sm)] px-2 py-1.5 text-left hover:bg-[var(--surface-hover)]">
-                <code className="text-xs">{`{{${m.chave}}}`}</code>
-                <span className="text-[.68rem] text-[var(--ink-3)]">{m.descricao}</span>
-              </button>
+          <div className="flex flex-col gap-3">
+            {[...new Set(marcadores.map((m) => m.grupo))].map((grupo) => (
+              <div key={grupo}>
+                <p className="mb-1 text-[.65rem] font-semibold uppercase tracking-wide text-[var(--ink-3)]">
+                  {grupo}
+                </p>
+                {marcadores
+                  .filter((m) => m.grupo === grupo)
+                  .map((m) => (
+                    <button key={m.chave} type="button" onClick={() => inserir(m.chave)}
+                      title={m.descricao}
+                      className="flex w-full flex-col items-start rounded-[var(--radius-sm)] px-2 py-1 text-left hover:bg-[var(--surface-hover)]">
+                      <code className="text-xs">{`{{${m.chave}}}`}</code>
+                      <span className="text-[.68rem] text-[var(--ink-3)]">{m.descricao}</span>
+                    </button>
+                  ))}
+              </div>
             ))}
           </div>
         </aside>

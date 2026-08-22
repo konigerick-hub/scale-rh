@@ -115,6 +115,7 @@ export default async function Painel({
           podeVerContrato={podeVerContrato(usuario)}
           envioDireto={modoArmazenamento === 'vercel-blob'}
         modelos={podeVerContrato(usuario) ? (base.modelos ?? []).map((m) => ({ id: m.id, nome: m.nome })) : []}
+        camposExtras={podeVerContrato(usuario) ? (base.camposPersonalizados ?? []) : []}
         />
       </main>
     </>

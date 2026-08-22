@@ -83,7 +83,10 @@ export type PessoaAgrupada = {
   }[];
   /** Só preenchido para quem pode ver contrato; senão vem null. */
   documentos: {
-    cpf: string; rg: string; nacionalidade: string; estadoCivil: string; endereco: string;
+    meiRazaoSocial: string; meiCnpj: string; meiEndereco: string;
+    cpf: string; rg: string; nacionalidade: string; estadoCivil: string;
+    endereco: string; telefone: string; email: string;
+    extras: Record<string, string>;
   } | null;
 };
 
@@ -137,11 +140,17 @@ export async function listarPessoas(
       temContrato: c.contrato !== null,
       documentos: incluirDocumentos
         ? {
+            meiRazaoSocial: c.documentos?.meiRazaoSocial ?? '',
+            meiCnpj: c.documentos?.meiCnpj ?? '',
+            meiEndereco: c.documentos?.meiEndereco ?? '',
             cpf: c.documentos?.cpf ?? '',
             rg: c.documentos?.rg ?? '',
             nacionalidade: c.documentos?.nacionalidade ?? '',
             estadoCivil: c.documentos?.estadoCivil ?? '',
             endereco: c.documentos?.endereco ?? '',
+            telefone: c.documentos?.telefone ?? '',
+            email: c.documentos?.email ?? '',
+            extras: c.documentos?.extras ?? {},
           }
         : null,
       ultimaAvaliacao: ultima

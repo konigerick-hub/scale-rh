@@ -7,16 +7,26 @@ import { salvarDocumentos } from '@/lib/actions/modelos';
 export type EmpresaOpcao = { id: string; nome: string };
 
 export type DocumentosEdicao = {
+  meiRazaoSocial: string;
+  meiCnpj: string;
+  meiEndereco: string;
   cpf: string;
   rg: string;
   nacionalidade: string;
   estadoCivil: string;
   endereco: string;
+  telefone: string;
+  email: string;
+  extras: Record<string, string>;
 };
 
 export const DOCS_VAZIOS: DocumentosEdicao = {
+  meiRazaoSocial: '', meiCnpj: '', meiEndereco: '',
   cpf: '', rg: '', nacionalidade: '', estadoCivil: '', endereco: '',
+  telefone: '', email: '', extras: {},
 };
+
+export type CampoExtra = { chave: string; rotulo: string };
 
 export type ColaboradorEdicao = {
   id: string;
@@ -32,6 +42,7 @@ type Props = {
   inicial: ColaboradorEdicao | null;
   /** Dados pessoais só aparecem para quem pode ver contrato (admin). */
   podeVerDocumentos: boolean;
+  camposExtras: CampoExtra[];
   aoFechar: () => void;
 };
 
@@ -42,6 +53,7 @@ export default function ColaboradorForm({
   empresas,
   inicial,
   podeVerDocumentos,
+  camposExtras,
   aoFechar,
 }: Props) {
   const [nome, setNome] = useState(inicial?.nome ?? '');
@@ -197,43 +209,100 @@ export default function ColaboradorForm({
               <summary className="cursor-pointer text-sm font-medium text-[var(--ink-2)]">
                 Dados para o contrato
                 <span className="ml-2 font-normal text-xs text-[var(--ink-3)]">
-                  CPF, RG, endereço — usados ao gerar o contrato
+                  MEI e titular — usados ao gerar o contrato
                 </span>
               </summary>
 
-              <div className="mt-4 flex flex-col gap-3">
-                <div className="grid grid-cols-2 gap-3">
+              <div className="mt-4 flex flex-col gap-4">
+                <fieldset className="flex flex-col gap-3">
+                  <legend className={rotulo}>Contratada — o MEI</legend>
                   <div>
-                    <label className={rotulo} htmlFor="d-cpf">CPF</label>
-                    <input id="d-cpf" className={campo} maxLength={20} placeholder="000.000.000-00"
-                      value={docs.cpf} onChange={(e) => mudarDoc({ cpf: e.target.value })} />
+                    <label className={rotulo} htmlFor="d-mrs">Razão social do MEI</label>
+                    <input id="d-mrs" className={campo} maxLength={160}
+                      placeholder="Fulano de Tal 000.000.000-00"
+                      value={docs.meiRazaoSocial}
+                      onChange={(e) => mudarDoc({ meiRazaoSocial: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={rotulo} htmlFor="d-cnpj">CNPJ do MEI</label>
+                      <input id="d-cnpj" className={campo} maxLength={20}
+                        placeholder="00.000.000/0001-00"
+                        value={docs.meiCnpj} onChange={(e) => mudarDoc({ meiCnpj: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={rotulo} htmlFor="d-tel">Telefone</label>
+                      <input id="d-tel" className={campo} maxLength={30} placeholder="(31) 90000-0000"
+                        value={docs.telefone} onChange={(e) => mudarDoc({ telefone: e.target.value })} />
+                    </div>
                   </div>
                   <div>
-                    <label className={rotulo} htmlFor="d-rg">RG</label>
-                    <input id="d-rg" className={campo} maxLength={30}
-                      value={docs.rg} onChange={(e) => mudarDoc({ rg: e.target.value })} />
+                    <label className={rotulo} htmlFor="d-msede">Endereço da sede do MEI</label>
+                    <input id="d-msede" className={campo} maxLength={300}
+                      value={docs.meiEndereco}
+                      onChange={(e) => mudarDoc({ meiEndereco: e.target.value })} />
                   </div>
-                </div>
+                </fieldset>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className={rotulo} htmlFor="d-nac">Nacionalidade</label>
-                    <input id="d-nac" className={campo} maxLength={60} placeholder="brasileiro(a)"
-                      value={docs.nacionalidade} onChange={(e) => mudarDoc({ nacionalidade: e.target.value })} />
+                <fieldset className="flex flex-col gap-3 border-t border-[var(--line)] pt-3">
+                  <legend className={rotulo}>Titular do MEI</legend>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={rotulo} htmlFor="d-cpf">CPF</label>
+                      <input id="d-cpf" className={campo} maxLength={20} placeholder="000.000.000-00"
+                        value={docs.cpf} onChange={(e) => mudarDoc({ cpf: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={rotulo} htmlFor="d-rg">RG</label>
+                      <input id="d-rg" className={campo} maxLength={30}
+                        value={docs.rg} onChange={(e) => mudarDoc({ rg: e.target.value })} />
+                    </div>
                   </div>
-                  <div>
-                    <label className={rotulo} htmlFor="d-ec">Estado civil</label>
-                    <input id="d-ec" className={campo} maxLength={40} placeholder="solteiro(a)"
-                      value={docs.estadoCivil} onChange={(e) => mudarDoc({ estadoCivil: e.target.value })} />
-                  </div>
-                </div>
 
-                <div>
-                  <label className={rotulo} htmlFor="d-end">Endereço completo</label>
-                  <input id="d-end" className={campo} maxLength={300}
-                    placeholder="Rua, número, bairro, cidade — UF, CEP"
-                    value={docs.endereco} onChange={(e) => mudarDoc({ endereco: e.target.value })} />
-                </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className={rotulo} htmlFor="d-nac">Nacionalidade</label>
+                      <input id="d-nac" className={campo} maxLength={60} placeholder="brasileiro(a)"
+                        value={docs.nacionalidade} onChange={(e) => mudarDoc({ nacionalidade: e.target.value })} />
+                    </div>
+                    <div>
+                      <label className={rotulo} htmlFor="d-ec">Estado civil</label>
+                      <input id="d-ec" className={campo} maxLength={40} placeholder="solteiro(a)"
+                        value={docs.estadoCivil} onChange={(e) => mudarDoc({ estadoCivil: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className={rotulo} htmlFor="d-end">Endereço residencial</label>
+                    <input id="d-end" className={campo} maxLength={300}
+                      placeholder="Rua, número, bairro, cidade — UF, CEP"
+                      value={docs.endereco} onChange={(e) => mudarDoc({ endereco: e.target.value })} />
+                  </div>
+
+                  <div>
+                    <label className={rotulo} htmlFor="d-mail">E-mail</label>
+                    <input id="d-mail" type="email" className={campo} maxLength={160}
+                      value={docs.email} onChange={(e) => mudarDoc({ email: e.target.value })} />
+                  </div>
+                </fieldset>
+
+                {camposExtras.length > 0 && (
+                  <fieldset className="flex flex-col gap-3 border-t border-[var(--line)] pt-3">
+                    <legend className={rotulo}>Campos personalizados</legend>
+                    {camposExtras.map((c) => (
+                      <div key={c.chave}>
+                        <label className={rotulo} htmlFor={`x-${c.chave}`}>
+                          {c.rotulo} <code className="normal-case">{`{{${c.chave}}}`}</code>
+                        </label>
+                        <input id={`x-${c.chave}`} className={campo} maxLength={300}
+                          value={docs.extras[c.chave] ?? ''}
+                          onChange={(e) =>
+                            mudarDoc({ extras: { ...docs.extras, [c.chave]: e.target.value } })
+                          } />
+                      </div>
+                    ))}
+                  </fieldset>
+                )}
 
                 <p className="text-xs text-[var(--ink-3)]">
                   Campo em branco vira uma linha para preencher à mão no contrato

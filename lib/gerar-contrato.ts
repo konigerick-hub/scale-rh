@@ -39,6 +39,56 @@ function ouLacuna(v: string | null | undefined, tamanho = 20): string {
   return t.length > 0 ? t : '_'.repeat(tamanho);
 }
 
+/* ---- Valor por extenso: contratos costumam exigir a forma escrita ---- */
+
+const UNIDADES = ['', 'um', 'dois', 'três', 'quatro', 'cinco', 'seis', 'sete', 'oito', 'nove'];
+const DEZ_A_DEZENOVE = ['dez', 'onze', 'doze', 'treze', 'quatorze', 'quinze', 'dezesseis', 'dezessete', 'dezoito', 'dezenove'];
+const DEZENAS = ['', '', 'vinte', 'trinta', 'quarenta', 'cinquenta', 'sessenta', 'setenta', 'oitenta', 'noventa'];
+const CENTENAS = ['', 'cento', 'duzentos', 'trezentos', 'quatrocentos', 'quinhentos', 'seiscentos', 'setecentos', 'oitocentos', 'novecentos'];
+
+function ate999(n: number): string {
+  if (n === 0) return '';
+  if (n === 100) return 'cem';
+  const c = Math.floor(n / 100);
+  const resto = n % 100;
+  const partes: string[] = [];
+  if (c > 0) partes.push(CENTENAS[c]);
+  if (resto >= 10 && resto < 20) partes.push(DEZ_A_DEZENOVE[resto - 10]);
+  else {
+    const d = Math.floor(resto / 10);
+    const u = resto % 10;
+    if (d > 0) partes.push(DEZENAS[d]);
+    if (u > 0) partes.push(UNIDADES[u]);
+  }
+  return partes.join(' e ');
+}
+
+export function reaisPorExtenso(centavos: number): string {
+  const reais = Math.floor(centavos / 100);
+  const cents = centavos % 100;
+  const partes: string[] = [];
+
+  if (reais === 0) partes.push('zero reais');
+  else {
+    const milhares = Math.floor(reais / 1000);
+    const resto = reais % 1000;
+    const blocos: string[] = [];
+    if (milhares === 1) blocos.push('mil');
+    else if (milhares > 1) blocos.push(`${ate999(milhares)} mil`);
+    if (resto > 0) blocos.push(ate999(resto));
+    // "mil e quinhentos" soa certo; "mil e duzentos e cinquenta" não —
+    // o "e" só entra quando o resto é menor que cem ou múltiplo de cem.
+    const juntar = milhares > 0 && resto > 0 && (resto < 100 || resto % 100 === 0) ? ' e ' : ' ';
+    const texto = blocos.join(juntar);
+    partes.push(`${texto} ${reais === 1 ? 'real' : 'reais'}`);
+  }
+
+  if (cents > 0) {
+    partes.push(`${ate999(cents)} ${cents === 1 ? 'centavo' : 'centavos'}`);
+  }
+  return partes.join(' e ');
+}
+
 export function preencherModelo(
   conteudo: string,
   colaborador: Colaborador,
@@ -47,19 +97,42 @@ export function preencherModelo(
 ): string {
   const doc = colaborador.documentos;
   const valores: Record<string, string> = {
+    // Contratada — o MEI
+    meiRazaoSocial: ouLacuna(doc?.meiRazaoSocial, 30),
+    meiCnpj: ouLacuna(doc?.meiCnpj, 18),
+    meiEndereco: ouLacuna(doc?.meiEndereco, 40),
+
+    // Titular do MEI
     nome: ouLacuna(colaborador.nome, 30),
     cpf: ouLacuna(doc?.cpf, 14),
     rg: ouLacuna(doc?.rg, 12),
     nacionalidade: ouLacuna(doc?.nacionalidade, 15),
     estadoCivil: ouLacuna(doc?.estadoCivil, 15),
     endereco: ouLacuna(doc?.endereco, 40),
-    empresa: empresa.nome,
-    cargo: ouLacuna(vinculo.cargo, 20),
-    salario: brl.format(vinculo.valorFixoCentavos / 100),
-    dataAdmissao: dataBR(colaborador.dataContratacao),
+    telefone: ouLacuna(doc?.telefone, 16),
+    email: ouLacuna(doc?.email, 24),
     nascimento: dataBR(colaborador.nascimento),
+
+    // Contratante — empresa do grupo
+    empresa: empresa.nome,
+    empresaRazaoSocial: ouLacuna(empresa.razaoSocial ?? empresa.nome, 30),
+    empresaCnpj: ouLacuna(empresa.cnpj, 18),
+    empresaEndereco: ouLacuna(empresa.endereco, 40),
+    empresaRepresentante: ouLacuna(empresa.representante, 30),
+    empresaRepresentanteCpf: ouLacuna(empresa.representanteCpf, 14),
+
+    // Objeto do contrato
+    servico: ouLacuna(vinculo.cargo, 20),
+    valorMensal: brl.format(vinculo.valorFixoCentavos / 100),
+    valorExtenso: reaisPorExtenso(vinculo.valorFixoCentavos),
+    inicio: dataBR(colaborador.dataContratacao),
     hoje: porExtenso(new Date()),
   };
+
+  // Campos personalizados entram junto, sem prioridade sobre os fixos.
+  for (const [chave, valor] of Object.entries(doc?.extras ?? {})) {
+    if (!(chave in valores)) valores[chave] = ouLacuna(valor, 20);
+  }
 
   // Aceita {{nome}} e {{ nome }}, e deixa intacto um marcador desconhecido —
   // assim um erro de digitação aparece no PDF em vez de virar texto vazio.
